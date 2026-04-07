@@ -70,7 +70,7 @@ def resolve_role_assignment(
             provider=candidate.provider,
             access_mode=candidate.access_mode,
             model=candidate.model,
-            command=None if candidate.access_mode == AccessMode.API else candidate.command,
+            command=_assignment_command(candidate),
             requires_additional_approval=requires_approval,
         )
         return AssignmentResolution(
@@ -87,3 +87,11 @@ def resolve_role_assignment(
         selected_candidate=None,
         fallback_event=None,
     )
+
+
+def _assignment_command(candidate: RoleCandidate) -> str | None:
+    if candidate.access_mode == AccessMode.API:
+        return None
+    if candidate.access_mode == AccessMode.SUBSCRIPTION and not candidate.simulation and candidate.cli_command:
+        return candidate.cli_command
+    return candidate.command

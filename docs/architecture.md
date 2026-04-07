@@ -8,7 +8,7 @@ Patchrail is a local-first control plane that records supervised coding-agent wo
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
 - `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
 - `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, and artifact lookup.
-- `patchrail.runners`: runner interface, shell-backed local harness execution, and API-backed executor runners for supported providers.
+- `patchrail.runners`: runner interface, shell-backed local harness execution, API-backed executor runners, and Claude-backed subscription executor runners.
 - `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls.
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
 - `patchrail.approval`: explicit task approval and fallback approval request handling plus ledger appends.
@@ -103,14 +103,17 @@ Current adapter behavior:
 - `claude_code`, `grok_runner`, `codex_runner`, and `auto` are CLI entrypoints into the executor phase.
 - The selected executor candidate supplies the concrete command when a shell-backed path is used.
 - When the selected executor candidate uses `access_mode=api`, Patchrail routes the run through a provider HTTP adapter instead of the local harness.
+- When the selected executor candidate uses `access_mode=subscription` and provider `claude`, Patchrail routes the run through a Claude CLI print-mode adapter.
 - Shell mode receives `PATCHRAIL_TASK_FILE`, `PATCHRAIL_PLAN_FILE`, `PATCHRAIL_OUTPUT_FILE`, `PATCHRAIL_RUN_ID`, and `PATCHRAIL_RUNNER_NAME`.
 - `patchrail.runners.local_harness` is the built-in shell target for local end-to-end testing.
 - API mode currently supports:
   - `codex api` via OpenAI Responses API
   - `claude api` via Anthropic Messages API
   - `grok api` via xAI Chat Completions API
+- Subscription mode currently supports:
+  - `claude subscription` via `claude -p --output-format json`
 
-Subscription CLI execution remains deferred until the non-interactive contracts are stable enough to trust in the core runtime.
+`codex subscription` execution remains deferred until the non-interactive runtime path is stable enough to trust in the core runtime.
 
 ## Storage Layout
 Default root: `.patchrail/`

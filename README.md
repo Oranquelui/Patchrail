@@ -45,6 +45,13 @@ python3 -m patchrail.cli preflight --role executor --runner grok_runner --access
 python3 -m patchrail.cli run --task-id <task_id> --runner grok_runner --access-mode api
 ```
 
+Claude subscription execution も live runner で試せます。
+
+```bash
+python3 -m patchrail.cli preflight --role executor --runner claude_code --access-mode subscription
+python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
+```
+
 cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
 
 ローカルストアを直接開かなくても、`patchrail list tasks|plans|runs|reviews|approvals|fallback-requests|preflight-snapshots` で主要レコードを一覧できます。

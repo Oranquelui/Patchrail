@@ -79,6 +79,12 @@ python3 -m patchrail.cli preflight --role executor --runner grok_runner --access
 python3 -m patchrail.cli run --task-id <task_id> --runner grok_runner --access-mode api
 ```
 
+Claude subscription executor の最短手順:
+```bash
+python3 -m patchrail.cli preflight --role executor --runner claude_code --access-mode subscription
+python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
+```
+
 ## Manual Flow
 ```bash
 cd /path/to/Patchrail
@@ -130,6 +136,8 @@ python3 -m patchrail.cli run --task-id <task_id> --runner auto
 `real` preset では executor の先頭候補が `grok api` だが、`XAI_API_KEY` が無い場合は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
 
 一方で `--runner grok_runner --access-mode api` を使えば、`grok_api_executor` を直接選べる。これは live API path の疎通確認に向いている。
+
+`--runner claude_code --access-mode subscription` を使えば、`claude_subscription_executor` を直接選べる。これは live subscription path の疎通確認に向いている。
 
 最短の real smoke:
 ```bash

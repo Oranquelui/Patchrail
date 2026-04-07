@@ -31,6 +31,7 @@ from patchrail.models.entities import (
 from patchrail.models.roles import AccessMode, Provider, Role
 from patchrail.review.service import ReviewService
 from patchrail.runners.api import build_api_runner
+from patchrail.runners.subscription import build_subscription_runner
 from patchrail.runners.stub import build_runner
 from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
@@ -148,6 +149,13 @@ class PatchrailApp:
             and not resolution.selected_candidate.simulation
         ):
             runner = build_api_runner(resolution.selected_candidate, runner_name)
+        elif (
+            resolution.selected_candidate
+            and resolution.selected_candidate.access_mode == AccessMode.SUBSCRIPTION
+            and not resolution.selected_candidate.simulation
+            and resolution.selected_candidate.provider == Provider.CLAUDE
+        ):
+            runner = build_subscription_runner(resolution.selected_candidate, runner_name)
         else:
             runner = build_runner(runner_name, command=assignment_selection.command)
         assignment = RunnerAssignment(

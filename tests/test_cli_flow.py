@@ -347,6 +347,76 @@ def test_run_can_use_api_executor_path(
     assert executed["run"]["runner_assignment"]["command"] == "provider-api:grok"
 
 
+def test_run_can_use_subscription_executor_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-subscription"))
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    class FakeSubscriptionRunner:
+        name = "claude_code"
+        mode = "subscription"
+        command = "provider-subscription:claude"
+
+        def run(self, task, plan, workspace_path, run_id):  # noqa: ANN001
+            return RunnerResult(
+                stdout="subscription runner stdout\n",
+                stderr="",
+                execution_summary="# Subscription Execution Summary\n",
+                diff_summary="- Subscription diff summary\n",
+                cost_metrics=CostMetrics(
+                    prompt_tokens=12,
+                    completion_tokens=18,
+                    estimated_usd=0.03,
+                    elapsed_seconds=2.0,
+                ),
+                exit_code=0,
+            )
+
+    monkeypatch.setattr(
+        "patchrail.core.service.build_subscription_runner",
+        lambda candidate, runner_name: FakeSubscriptionRunner(),
+        raising=False,
+    )
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Subscription path", "--description", "Use executor subscription path"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, _ = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Plan before subscription run", "--step", "Plan"],
+        capsys,
+    )
+    assert exit_code == 0
+
+    exit_code, executed = run_cli(
+        ["run", "--task-id", task_id, "--runner", "claude_code", "--access-mode", "subscription"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert executed["run"]["resolved_assignment"]["provider"] == "claude"
+    assert executed["run"]["resolved_assignment"]["access_mode"] == "subscription"
+    assert executed["run"]["runner_assignment"]["mode"] == "subscription"
+    assert executed["run"]["runner_assignment"]["command"] == "provider-subscription:claude"
+
+
 def test_list_commands_return_tasks_runs_and_approvals(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
