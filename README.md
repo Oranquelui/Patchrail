@@ -1,0 +1,29 @@
+# Patchrail
+
+Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現段階では CLI と headless core に絞り、`task -> plan -> run -> review -> approval` の状態遷移、artifact bundle、decision trace、approval ledger をローカルに残します。現在は `planner / reviewer / executor` に対して `provider × access_mode(api|subscription)` の候補集合を持ち、各フェーズ開始時に preflight と policy 解決を行って concrete assignment を固定保存します。
+
+## Quickstart
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e .
+python3 -m patchrail.cli config init
+python3 -m patchrail.cli preflight --role planner
+pytest -q
+sh scripts/local_smoke_test.sh
+python3 -m patchrail.cli list tasks
+python3 -m patchrail.cli list preflight-snapshots
+```
+
+`config init` は `.patchrail/config/role-policy.json` を作成します。デフォルト設定は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。
+
+cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
+
+ローカルストアを直接開かなくても、`patchrail list tasks|plans|runs|reviews|approvals|fallback-requests|preflight-snapshots` で主要レコードを一覧できます。
+
+## Docs
+- [Architecture](docs/architecture.md)
+- [MVP](docs/mvp.md)
+- [Local Testing](docs/local-testing.md)
+- [Backlog](docs/backlog.md)
+- [Agents Contract](AGENTS.md)

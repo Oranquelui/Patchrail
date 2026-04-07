@@ -1,0 +1,189 @@
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+from patchrail.models.roles import AccessMode, Provider, Role, RoleCandidate, RolePolicy, RolePolicySet
+
+
+class ConfigStore:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.config_dir = self.root / "config"
+        self.config_path = self.config_dir / "role-policy.json"
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+
+    def init_default(self) -> RolePolicySet:
+        policy = self._default_policy()
+        self.write_policy(policy)
+        return policy
+
+    def load_policy(self) -> RolePolicySet:
+        if not self.config_path.exists():
+            return self.init_default()
+        return RolePolicySet.from_dict(json.loads(self.config_path.read_text()))
+
+    def write_policy(self, policy: RolePolicySet) -> None:
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.config_path.write_text(json.dumps(policy.to_dict(), indent=2, sort_keys=True) + "\n")
+
+    def _default_policy(self) -> RolePolicySet:
+        python_bin = sys.executable
+        harness_command = f"{python_bin} -m patchrail.runners.local_harness"
+
+        planner = RolePolicy(
+            role=Role.PLANNER,
+            candidates=[
+                RoleCandidate(
+                    name="claude_subscription_planner",
+                    role=Role.PLANNER,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.PLANNER,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "subscription",
+                            "capabilities": ["planning", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    simulation=True,
+                ),
+                RoleCandidate(
+                    name="codex_api_planner",
+                    role=Role.PLANNER,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.PLANNER,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "api",
+                            "capabilities": ["planning", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="PATCHRAIL_CODEX_API_KEY",
+                    endpoint_env="PATCHRAIL_CODEX_API_BASE",
+                ),
+            ],
+        )
+        reviewer = RolePolicy(
+            role=Role.REVIEWER,
+            candidates=[
+                RoleCandidate(
+                    name="codex_subscription_reviewer",
+                    role=Role.REVIEWER,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.REVIEWER,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "subscription",
+                            "capabilities": ["review", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    simulation=True,
+                ),
+                RoleCandidate(
+                    name="claude_api_reviewer",
+                    role=Role.REVIEWER,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.REVIEWER,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "api",
+                            "capabilities": ["review", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="PATCHRAIL_CLAUDE_API_KEY",
+                    endpoint_env="PATCHRAIL_CLAUDE_API_BASE",
+                ),
+            ],
+        )
+        executor = RolePolicy(
+            role=Role.EXECUTOR,
+            candidates=[
+                RoleCandidate(
+                    name="grok_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.GROK,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "grok",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    simulation=True,
+                ),
+                RoleCandidate(
+                    name="claude_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    simulation=True,
+                ),
+                RoleCandidate(
+                    name="codex_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    simulation=True,
+                ),
+                RoleCandidate(
+                    name="grok_api_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.GROK,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "grok",
+                            "access_mode": "api",
+                            "capabilities": ["execution", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="PATCHRAIL_GROK_API_KEY",
+                    endpoint_env="PATCHRAIL_GROK_API_BASE",
+                ),
+            ],
+        )
+        return RolePolicySet(roles={Role.PLANNER: planner, Role.REVIEWER: reviewer, Role.EXECUTOR: executor})
