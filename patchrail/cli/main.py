@@ -26,8 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     plan_parser = subparsers.add_parser("plan")
     plan_parser.add_argument("--task-id", required=True)
-    plan_parser.add_argument("--summary", required=True)
-    plan_parser.add_argument("--step", action="append", required=True)
+    plan_parser.add_argument("--summary")
+    plan_parser.add_argument("--step", action="append")
+    plan_parser.add_argument("--auto", action="store_true")
+    plan_parser.add_argument("--access-mode", choices=["api", "subscription", "auto"], default="auto")
 
     preflight_parser = subparsers.add_parser("preflight")
     preflight_parser.add_argument("--role", choices=["planner", "reviewer", "executor"], required=True)
@@ -46,8 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     review_parser = subparsers.add_parser("review")
     review_parser.add_argument("--run-id", required=True)
-    review_parser.add_argument("--verdict", choices=["pass", "fail"], required=True)
-    review_parser.add_argument("--summary", required=True)
+    review_parser.add_argument("--verdict", choices=["pass", "fail"])
+    review_parser.add_argument("--summary")
+    review_parser.add_argument("--auto", action="store_true")
+    review_parser.add_argument("--access-mode", choices=["api", "subscription", "auto"], default="auto")
 
     approve_parser = subparsers.add_parser("approve")
     approve_parser.add_argument("--task-id", required=True)
@@ -98,7 +102,13 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "config" and args.config_command == "init":
         return app.init_config(preset=args.preset)
     if args.command == "plan":
-        return app.create_plan(task_id=args.task_id, summary=args.summary, steps=args.step)
+        return app.create_plan(
+            task_id=args.task_id,
+            summary=args.summary,
+            steps=args.step,
+            auto=args.auto,
+            access_mode_name=args.access_mode,
+        )
     if args.command == "preflight":
         return app.preflight(role_name=args.role, runner_name=args.runner, access_mode_name=args.access_mode)
     if args.command == "run":
@@ -106,7 +116,13 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "status":
         return app.get_status(task_id=args.task_id, run_id=args.run_id)
     if args.command == "review":
-        return app.review_run(run_id=args.run_id, verdict=args.verdict, summary=args.summary)
+        return app.review_run(
+            run_id=args.run_id,
+            verdict=args.verdict,
+            summary=args.summary,
+            auto=args.auto,
+            access_mode_name=args.access_mode,
+        )
     if args.command == "approve":
         return app.approve_task(task_id=args.task_id, rationale=args.rationale)
     if args.command == "approve-fallback":

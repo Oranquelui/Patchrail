@@ -34,6 +34,7 @@ pytest -q
 ```bash
 sh scripts/local_smoke_test.sh
 PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
+PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
 ```
 5. 保存済みレコードを一覧する。
 ```bash
@@ -59,6 +60,10 @@ python3 -m patchrail.cli list preflight-snapshots
 - `PATCHRAIL_CONFIG_PRESET=local|real`
 - `PATCHRAIL_RUNNER=auto|claude_code|grok_runner|codex_runner`
 - `PATCHRAIL_AUTO_APPROVE_FALLBACK=0|1`
+- `PATCHRAIL_AUTO_PLAN=0|1`
+- `PATCHRAIL_PLAN_ACCESS_MODE=auto|api|subscription`
+- `PATCHRAIL_AUTO_REVIEW=0|1`
+- `PATCHRAIL_REVIEW_ACCESS_MODE=auto|api|subscription`
 
 デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。
 
@@ -83,6 +88,15 @@ Claude subscription executor の最短手順:
 ```bash
 python3 -m patchrail.cli preflight --role executor --runner claude_code --access-mode subscription
 python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
+```
+
+Auto planner / reviewer の最短手順:
+```bash
+python3 -m patchrail.cli plan --task-id <task_id> --auto
+python3 -m patchrail.cli review --run-id <run_id> --auto
+
+# real preset で reviewer を live API path に寄せる場合
+python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
 ```
 
 ## Manual Flow
@@ -144,6 +158,14 @@ python3 -m patchrail.cli run --task-id <task_id> --runner auto
 PATCHRAIL_HOME="$PWD/.patchrail-real" \
 PATCHRAIL_CONFIG_PRESET=real \
 PATCHRAIL_AUTO_APPROVE_FALLBACK=1 \
+sh scripts/local_smoke_test.sh
+```
+
+最短の local auto smoke:
+```bash
+PATCHRAIL_HOME="$PWD/.patchrail-auto" \
+PATCHRAIL_AUTO_PLAN=1 \
+PATCHRAIL_AUTO_REVIEW=1 \
 sh scripts/local_smoke_test.sh
 ```
 

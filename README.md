@@ -17,6 +17,7 @@ python3 -m patchrail.cli preflight --role executor --runner auto
 pytest -q
 sh scripts/local_smoke_test.sh
 PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
+PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
 python3 -m patchrail.cli list tasks
 python3 -m patchrail.cli list preflight-snapshots
 ```
@@ -37,6 +38,7 @@ python3 -m patchrail.cli list preflight-snapshots
 `scripts/local_smoke_test.sh` は現在 `local` と `real` の両 preset を扱えます。
 - `local`: `sh scripts/local_smoke_test.sh`
 - `real`: `PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh`
+- `local auto plan/review`: `PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh`
 
 executor の API path を試す場合は `--access-mode api` を使います。たとえば Grok API executor は次で選べます。
 
@@ -51,6 +53,21 @@ Claude subscription execution も live runner で試せます。
 python3 -m patchrail.cli preflight --role executor --runner claude_code --access-mode subscription
 python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
 ```
+
+planner / reviewer も auto path を持ちます。manual 入力を残したまま、`--auto` で role candidate に生成を任せられます。
+
+```bash
+python3 -m patchrail.cli plan --task-id <task_id> --auto
+python3 -m patchrail.cli review --run-id <run_id> --auto
+python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
+```
+
+現時点では、auto generation の live support は次です。
+- planner: `claude subscription`, `codex api`
+- reviewer: `claude api`
+- executor: `claude subscription`, `codex api`, `claude api`, `grok api`
+
+`codex subscription` は non-interactive runtime がまだ不安定なので、auto review / executor の live path では既定採用していません。
 
 cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
 

@@ -4,12 +4,12 @@
 Patchrail is a local-first control plane that records supervised coding-agent workflows as explicit state transitions. The MVP is a headless core with a thin CLI wrapper. It accepts a task, stores a plan, resolves role assignments through a provider and access-mode policy, records a run, persists an artifact bundle, captures a review result, and requires an explicit human approval or rejection before completion.
 
 ## Core Modules
-- `patchrail.cli`: `argparse`-based command surface for task, config, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands, including explicit `access_mode` filters for executor testing.
+- `patchrail.cli`: `argparse`-based command surface for task, config, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands, including explicit `access_mode` filters and auto/manual plan-review paths.
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
 - `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
 - `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, and artifact lookup.
 - `patchrail.runners`: runner interface, shell-backed local harness execution, API-backed executor runners, and Claude-backed subscription executor runners.
-- `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls.
+- `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls plus planner/reviewer auto-generation.
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
 - `patchrail.approval`: explicit task approval and fallback approval request handling plus ledger appends.
 - `patchrail.artifacts`: artifact bundle creation and lookup.
@@ -64,7 +64,7 @@ Role policy is stored locally under `.patchrail/config/role-policy.json`.
 
 Config presets:
 - `local`: simulation-backed role policy for deterministic local testing
-- `real`: live-readiness role policy for Codex, Claude, and Grok API/subscription checks while execution still uses the local harness
+- `real`: live-readiness role policy for Codex, Claude, and Grok API/subscription checks with selective live plan/run adapters where Patchrail can supervise them safely
 
 Phase flow:
 1. Load the policy set for the requested role.
@@ -89,7 +89,7 @@ Preflight checks:
 
 `grok` is API-only in the default policy set. Patchrail does not currently ship a default `grok subscription` candidate because the CLI contract is not yet stable enough for supervised runtime use.
 
-The default `local` policy intentionally uses simulation-backed subscription candidates so the ontology and approval rules can be tested without live provider credentials. The `real` preset switches readiness truthfulness on without changing executor output generation yet.
+The default `local` policy intentionally uses simulation-backed candidates so the ontology and approval rules can be tested without live provider credentials. The `real` preset switches readiness truthfulness on and enables only the live paths that Patchrail can currently supervise safely.
 
 ## Runner Model
 The runner contract is intentionally narrow:
@@ -114,6 +114,15 @@ Current adapter behavior:
   - `claude subscription` via `claude -p --output-format json`
 
 `codex subscription` execution remains deferred until the non-interactive runtime path is stable enough to trust in the core runtime.
+
+Planner / reviewer automation:
+- `plan --auto` resolves the planner candidate and generates structured `summary + steps`.
+- `review --auto` resolves the reviewer candidate and generates structured `verdict + summary`.
+- Local preset uses deterministic simulated generation for both.
+- Live automation currently supports:
+  - planner: `claude subscription`, `codex api`
+  - reviewer: `claude api`
+- Unsupported live candidates fail loudly instead of silently downgrading to manual or stub behavior.
 
 ## Storage Layout
 Default root: `.patchrail/`
@@ -155,12 +164,12 @@ Read-side navigation:
 ## Artifact And Approval Flow
 1. `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
 2. `task create` stores a new task and appends a decision trace.
-3. `plan` resolves the planner candidate, stores the plan with preflight evidence, updates the task to `planned`, and appends decision traces.
+3. `plan` resolves the planner candidate, optionally auto-generates plan content, stores the plan with preflight evidence, updates the task to `planned`, and appends decision traces.
 4. Every `plan`, `run`, and `review` resolution attempt first writes a standalone `PreflightSnapshot`.
 5. If role resolution hits a blocked fallback, Patchrail stores a `FallbackApprovalRequest`, appends trace and fallback-approval ledger entries, and stops the phase without mutating the task lifecycle.
 6. `approve-fallback` or `reject-fallback` records the human decision for that deviation request.
 7. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
-8. `review` resolves the reviewer candidate, stores the review result with rationale and preflight evidence, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
+8. `review` resolves the reviewer candidate, optionally auto-generates review content, stores the review result with rationale and preflight evidence, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
 9. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
 
 ## Deferred Hook Contract

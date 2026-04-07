@@ -9,6 +9,10 @@ PATCHRAIL_HOME=${PATCHRAIL_HOME:-"$ROOT_DIR/.patchrail"}
 PATCHRAIL_CONFIG_PRESET=${PATCHRAIL_CONFIG_PRESET:-local}
 PATCHRAIL_RUNNER=${PATCHRAIL_RUNNER:-auto}
 PATCHRAIL_AUTO_APPROVE_FALLBACK=${PATCHRAIL_AUTO_APPROVE_FALLBACK:-}
+PATCHRAIL_AUTO_PLAN=${PATCHRAIL_AUTO_PLAN:-0}
+PATCHRAIL_PLAN_ACCESS_MODE=${PATCHRAIL_PLAN_ACCESS_MODE:-auto}
+PATCHRAIL_AUTO_REVIEW=${PATCHRAIL_AUTO_REVIEW:-0}
+PATCHRAIL_REVIEW_ACCESS_MODE=${PATCHRAIL_REVIEW_ACCESS_MODE:-auto}
 
 if [ -z "$PATCHRAIL_AUTO_APPROVE_FALLBACK" ]; then
   if [ "$PATCHRAIL_CONFIG_PRESET" = "real" ]; then
@@ -63,11 +67,18 @@ create_output=$(run_patchrail task create \
   --description "Exercise the local Patchrail flow")
 task_id=$(printf '%s' "$create_output" | json_query task id)
 
-run_patchrail plan \
-  --task-id "$task_id" \
-  --summary "Run the local smoke harness" \
-  --step "Resolve planner candidate" \
-  --step "Execute local runner" >/dev/null
+if [ "$PATCHRAIL_AUTO_PLAN" = "1" ]; then
+  run_patchrail plan \
+    --task-id "$task_id" \
+    --auto \
+    --access-mode "$PATCHRAIL_PLAN_ACCESS_MODE" >/dev/null
+else
+  run_patchrail plan \
+    --task-id "$task_id" \
+    --summary "Run the local smoke harness" \
+    --step "Resolve planner candidate" \
+    --step "Execute local runner" >/dev/null
+fi
 
 set +e
 run_output=$(run_patchrail run --task-id "$task_id" --runner "$PATCHRAIL_RUNNER" 2>&1)
@@ -101,10 +112,17 @@ fi
 
 run_id=$(printf '%s' "$run_output" | json_query run id)
 
-run_patchrail review \
-  --run-id "$run_id" \
-  --verdict pass \
-  --summary "Local smoke run reviewed" >/dev/null
+if [ "$PATCHRAIL_AUTO_REVIEW" = "1" ]; then
+  run_patchrail review \
+    --run-id "$run_id" \
+    --auto \
+    --access-mode "$PATCHRAIL_REVIEW_ACCESS_MODE" >/dev/null
+else
+  run_patchrail review \
+    --run-id "$run_id" \
+    --verdict pass \
+    --summary "Local smoke run reviewed" >/dev/null
+fi
 
 run_patchrail approve \
   --task-id "$task_id" \
@@ -113,6 +131,6 @@ run_patchrail approve \
 status_output=$(run_patchrail status --task-id "$task_id")
 final_state=$(printf '%s' "$status_output" | json_query task state)
 
-printf 'Local smoke flow completed: preset=%s task=%s run=%s state=%s fallback_approved=%s\n' \
-  "$PATCHRAIL_CONFIG_PRESET" "$task_id" "$run_id" "$final_state" "$fallback_approved"
+printf 'Local smoke flow completed: preset=%s task=%s run=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s\n' \
+  "$PATCHRAIL_CONFIG_PRESET" "$task_id" "$run_id" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW"
 printf 'PATCHRAIL_HOME=%s\n' "$PATCHRAIL_HOME"

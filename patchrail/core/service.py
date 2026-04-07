@@ -29,6 +29,7 @@ from patchrail.models.entities import (
     serialize,
 )
 from patchrail.models.roles import AccessMode, Provider, Role
+from patchrail.providers.role_generation import generate_plan_content, generate_review_content
 from patchrail.review.service import ReviewService
 from patchrail.runners.api import build_api_runner
 from patchrail.runners.subscription import build_subscription_runner
@@ -90,12 +91,36 @@ class PatchrailApp:
             "fallback_event": serialize(resolution.fallback_event) if resolution.fallback_event else None,
         }
 
-    def create_plan(self, task_id: str, summary: str, steps: list[str]) -> dict[str, Any]:
+    def create_plan(
+        self,
+        task_id: str,
+        summary: str | None,
+        steps: list[str] | None,
+        auto: bool = False,
+        access_mode_name: str = "auto",
+    ) -> dict[str, Any]:
         task = self.store.load_task(task_id)
         require_state(task, TaskState.CREATED, "create a plan")
-        resolution = resolve_role_assignment(self.config.load_policy(), role=Role.PLANNER)
+        self._validate_plan_inputs(auto=auto, summary=summary, steps=steps)
+        resolution = resolve_role_assignment(
+            self.config.load_policy(),
+            role=Role.PLANNER,
+            access_mode_filter=self._access_mode_filter(access_mode_name) if auto else None,
+        )
         self._record_preflight_snapshot(task.id, phase=PreflightPhase.PLAN, role=Role.PLANNER, resolution=resolution)
         assignment = self._require_assignment(task, role=Role.PLANNER, resolution=resolution)
+        if auto:
+            if resolution.selected_candidate is None:
+                raise PatchrailError("No planner candidate was selected.")
+            summary, steps = generate_plan_content(resolution.selected_candidate, task)
+            self._append_trace(
+                task.id,
+                "plan.generated",
+                f"Generated plan content via {assignment.candidate_name}.",
+                metadata={"assignment": serialize(assignment)},
+            )
+        if summary is None or steps is None:
+            raise PatchrailError("Plan requires summary and at least one step.")
 
         plan = Plan(
             id=generate_id("plan"),
@@ -237,20 +262,57 @@ class PatchrailApp:
         self.hooks.dispatch(HookEvent(name="run.completed", payload={"task_id": task.id, "run_id": run.id}))
         return {"run": serialize(run), "task": serialize(task), "artifact_bundle": serialize(bundle)}
 
-    def review_run(self, run_id: str, verdict: str, summary: str) -> dict[str, Any]:
+    def review_run(
+        self,
+        run_id: str,
+        verdict: str | None,
+        summary: str | None,
+        auto: bool = False,
+        access_mode_name: str = "auto",
+    ) -> dict[str, Any]:
         run = self.store.load_run(run_id)
         task = self.store.load_task(run.task_id)
         if task.latest_run_id != run.id:
             raise PatchrailError(f"Run {run.id} is not the latest run for task {task.id}.")
-        resolution = resolve_role_assignment(self.config.load_policy(), role=Role.REVIEWER)
+        self._validate_review_inputs(auto=auto, verdict=verdict, summary=summary)
+        resolution = resolve_role_assignment(
+            self.config.load_policy(),
+            role=Role.REVIEWER,
+            access_mode_filter=self._access_mode_filter(access_mode_name) if auto else None,
+        )
         self._record_preflight_snapshot(task.id, phase=PreflightPhase.REVIEW, role=Role.REVIEWER, resolution=resolution)
         assignment = self._require_assignment(task, role=Role.REVIEWER, resolution=resolution)
+        if auto:
+            if task.plan_id is None:
+                raise PatchrailError(f"Task {task.id} has no plan for automated review.")
+            if resolution.selected_candidate is None:
+                raise PatchrailError("No reviewer candidate was selected.")
+            plan = self.store.load_plan(task.plan_id)
+            bundle = self.store.load_artifact_bundle(run.id)
+            verdict_value, summary_value = generate_review_content(
+                resolution.selected_candidate,
+                task,
+                plan,
+                run,
+                bundle,
+            )
+            self._append_trace(
+                task.id,
+                "review.generated",
+                f"Generated review content via {assignment.candidate_name}.",
+                metadata={"assignment": serialize(assignment), "verdict": verdict_value.value},
+            )
+        else:
+            if verdict is None or summary is None:
+                raise PatchrailError("Review requires verdict and summary.")
+            verdict_value = ReviewVerdict(verdict)
+            summary_value = summary
 
         review = self.review.create_review(
             task,
             run,
-            ReviewVerdict(verdict),
-            summary,
+            verdict_value,
+            summary_value,
             resolved_assignment=assignment,
             preflight_results=resolution.results,
             fallback_event=resolution.fallback_event,
@@ -423,6 +485,18 @@ class PatchrailApp:
         if access_mode_name in (None, "auto"):
             return None
         return AccessMode(access_mode_name)
+
+    def _validate_plan_inputs(self, auto: bool, summary: str | None, steps: list[str] | None) -> None:
+        if auto and (summary is not None or steps):
+            raise PatchrailError("Use either manual plan inputs or --auto, not both.")
+        if not auto and (summary is None or not steps):
+            raise PatchrailError("Manual plan creation requires --summary and at least one --step.")
+
+    def _validate_review_inputs(self, auto: bool, verdict: str | None, summary: str | None) -> None:
+        if auto and (verdict is not None or summary is not None):
+            raise PatchrailError("Use either manual review inputs or --auto, not both.")
+        if not auto and (verdict is None or summary is None):
+            raise PatchrailError("Manual review requires --verdict and --summary.")
 
     def _require_assignment(self, task: Task, role: Role, resolution: Any) -> Any:
         if resolution.selected_assignment is None:

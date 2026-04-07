@@ -417,6 +417,80 @@ def test_run_can_use_subscription_executor_path(
     assert executed["run"]["runner_assignment"]["command"] == "provider-subscription:claude"
 
 
+def test_plan_and_review_support_auto_generation_in_local_preset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-auto"))
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Auto flow", "--description", "Generate plan and review automatically"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(["plan", "--task-id", task_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert planned["plan"]["resolved_assignment"]["role"] == "planner"
+    assert planned["plan"]["summary"]
+    assert planned["plan"]["steps"]
+
+    exit_code, executed = run_cli(["run", "--task-id", task_id, "--runner", "claude_code"], capsys)
+    assert exit_code == 0
+    run_id = executed["run"]["id"]
+
+    exit_code, reviewed = run_cli(["review", "--run-id", run_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert reviewed["review"]["resolved_assignment"]["role"] == "reviewer"
+    assert reviewed["review"]["verdict"] in {"pass", "fail"}
+    assert reviewed["review"]["summary"]
+
+
+def test_plan_auto_can_use_subscription_planner_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-plan-auto-real"))
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    monkeypatch.setattr(
+        "patchrail.core.service.generate_plan_content",
+        lambda candidate, task: ("Auto subscription plan", ["Inspect task", "Prepare bounded execution"]),
+        raising=False,
+    )
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Auto plan real", "--description", "Use subscription planner path"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(["plan", "--task-id", task_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert planned["plan"]["summary"] == "Auto subscription plan"
+    assert planned["plan"]["resolved_assignment"]["provider"] == "claude"
+    assert planned["plan"]["resolved_assignment"]["access_mode"] == "subscription"
+
+
 def test_list_commands_return_tasks_runs_and_approvals(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
