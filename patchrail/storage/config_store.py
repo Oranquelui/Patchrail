@@ -125,23 +125,6 @@ class ConfigStore:
             role=Role.EXECUTOR,
             candidates=[
                 RoleCandidate(
-                    name="grok_subscription_executor",
-                    role=Role.EXECUTOR,
-                    provider=Provider.GROK,
-                    access_mode=AccessMode.SUBSCRIPTION,
-                    capability_profile=RoleCandidate.from_dict(
-                        Role.EXECUTOR,
-                        {
-                            "name": "temp",
-                            "provider": "grok",
-                            "access_mode": "subscription",
-                            "capabilities": ["execution", "json_output", "noninteractive"],
-                        },
-                    ).capability_profile,
-                    command=harness_command,
-                    simulation=True,
-                ),
-                RoleCandidate(
                     name="claude_subscription_executor",
                     role=Role.EXECUTOR,
                     provider=Provider.CLAUDE,
@@ -191,6 +174,7 @@ class ConfigStore:
                         },
                     ).capability_profile,
                     command=harness_command,
+                    simulation=True,
                     api_key_env="PATCHRAIL_GROK_API_KEY",
                     endpoint_env="PATCHRAIL_GROK_API_BASE",
                 ),
@@ -286,21 +270,22 @@ class ConfigStore:
             role=Role.EXECUTOR,
             candidates=[
                 RoleCandidate(
-                    name="grok_subscription_executor",
+                    name="grok_api_executor",
                     role=Role.EXECUTOR,
                     provider=Provider.GROK,
-                    access_mode=AccessMode.SUBSCRIPTION,
+                    access_mode=AccessMode.API,
+                    model="grok-4-0709",
                     capability_profile=RoleCandidate.from_dict(
                         Role.EXECUTOR,
                         {
                             "name": "temp",
                             "provider": "grok",
-                            "access_mode": "subscription",
-                            "capabilities": ["execution", "json_output", "noninteractive"],
+                            "access_mode": "api",
+                            "capabilities": ["execution", "json_output"],
                         },
                     ).capability_profile,
                     command=harness_command,
-                    cli_command="grok",
+                    api_key_env="XAI_API_KEY",
                 ),
                 RoleCandidate(
                     name="claude_subscription_executor",
@@ -335,24 +320,6 @@ class ConfigStore:
                     ).capability_profile,
                     command=harness_command,
                     cli_command="codex",
-                ),
-                RoleCandidate(
-                    name="grok_api_executor",
-                    role=Role.EXECUTOR,
-                    provider=Provider.GROK,
-                    access_mode=AccessMode.API,
-                    model="grok-4-0709",
-                    capability_profile=RoleCandidate.from_dict(
-                        Role.EXECUTOR,
-                        {
-                            "name": "temp",
-                            "provider": "grok",
-                            "access_mode": "api",
-                            "capabilities": ["execution", "json_output"],
-                        },
-                    ).capability_profile,
-                    command=harness_command,
-                    api_key_env="XAI_API_KEY",
                 ),
             ],
         )

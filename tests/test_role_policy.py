@@ -56,8 +56,9 @@ def test_config_init_real_preset_writes_live_candidates(
     assert planner_candidate["cli_command"] == "claude"
     assert planner_candidate["simulation"] is False
     assert planner_candidate["command"] == f"{sys.executable} -m patchrail.runners.local_harness"
-    assert executor_candidate["name"] == "grok_subscription_executor"
-    assert executor_candidate["cli_command"] == "grok"
+    assert executor_candidate["name"] == "grok_api_executor"
+    assert executor_candidate["access_mode"] == "api"
+    assert executor_candidate["api_key_env"] == "XAI_API_KEY"
 
 
 def test_real_preset_preflight_uses_provider_status_checks(
@@ -89,12 +90,10 @@ def test_real_preset_preflight_uses_provider_status_checks(
     assert preflight_payload["selected_candidate"]["access_mode"] == "subscription"
 
     grok_result = preflight_payload["results"][0]
-    noninteractive_check = next(
-        check for check in grok_result["checks"] if check["name"] == "noninteractive_ok"
-    )
-    assert grok_result["candidate_name"] == "grok_subscription_executor"
+    credential_check = next(check for check in grok_result["checks"] if check["name"] == "credential_present")
+    assert grok_result["candidate_name"] == "grok_api_executor"
     assert grok_result["ready"] is False
-    assert noninteractive_check["passed"] is False
+    assert credential_check["passed"] is False
 
 
 def test_preflight_can_filter_by_access_mode(

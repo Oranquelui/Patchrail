@@ -1,7 +1,7 @@
 # Patchrail Backlog
 
 ## Next Milestones
-1. Replace the remaining shell/local-harness execution paths with real `codex` and `claude` subscription adapters while keeping the current role-policy contract stable.
+1. Replace the remaining shell/local-harness execution paths with real `codex` and `claude` subscription adapters while keeping the current role-policy contract stable. Grok remains API-only until its subscription contract is safe enough for supervision.
 2. Promote isolated run workspaces from simple manifest folders into real execution sandboxes with stronger provenance.
 3. Capture richer diffs, review summaries, and provenance metadata from runner outputs.
 4. Add richer filters and history views on top of the current list surface so the local store stays usable as record volume grows.

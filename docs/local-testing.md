@@ -66,7 +66,7 @@ python3 -m patchrail.cli list preflight-snapshots
 - `python3 -m patchrail.cli config init --preset real`
 - `codex subscription` は `codex login status` を使う
 - `claude subscription` は `claude auth status` を使う
-- `grok subscription` は現行統合では blocked 扱いになる
+- `grok` は API-only で、`grok subscription` 候補は既定 policy に含めない
 
 API 候補を試す場合は、対応する環境変数を設定する:
 - `OPENAI_API_KEY`
@@ -127,7 +127,7 @@ python3 -m patchrail.cli approve-fallback --task-id <task_id> --rationale "Allow
 python3 -m patchrail.cli run --task-id <task_id> --runner auto
 ```
 
-`real` preset では executor の先頭候補が `grok subscription` のため、通常は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
+`real` preset では executor の先頭候補が `grok api` だが、`XAI_API_KEY` が無い場合は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
 
 一方で `--runner grok_runner --access-mode api` を使えば、`grok_api_executor` を直接選べる。これは live API path の疎通確認に向いている。
 

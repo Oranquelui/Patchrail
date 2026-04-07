@@ -13,20 +13,22 @@ def perform_preflight(candidate: RoleCandidate) -> PreflightResult:
     checks: list[PreflightCheck] = []
 
     if candidate.access_mode == AccessMode.API:
-        credential_ok = bool(candidate.api_key_env and os.getenv(candidate.api_key_env))
-        endpoint_ok = True if candidate.endpoint_env is None else bool(os.getenv(candidate.endpoint_env))
+        credential_ok = candidate.simulation or bool(candidate.api_key_env and os.getenv(candidate.api_key_env))
+        endpoint_ok = candidate.simulation or (
+            True if candidate.endpoint_env is None else bool(os.getenv(candidate.endpoint_env))
+        )
         checks.append(
             PreflightCheck(
                 name="credential_present",
                 passed=credential_ok,
-                detail=candidate.api_key_env or "missing_api_key_env",
+                detail="simulation" if candidate.simulation else (candidate.api_key_env or "missing_api_key_env"),
             )
         )
         checks.append(
             PreflightCheck(
                 name="endpoint_configured",
                 passed=endpoint_ok,
-                detail=candidate.endpoint_env or "default_endpoint",
+                detail="simulation" if candidate.simulation else (candidate.endpoint_env or "default_endpoint"),
             )
         )
     else:
@@ -77,8 +79,6 @@ def _subscription_checks(candidate: RoleCandidate, cli_ok: bool) -> list[Preflig
         return _codex_subscription_checks(candidate)
     if candidate.provider == Provider.CLAUDE:
         return _claude_subscription_checks(candidate)
-    if candidate.provider == Provider.GROK:
-        return _grok_subscription_checks()
     return [
         PreflightCheck(name="login_ok", passed=False, detail="unsupported_provider"),
         PreflightCheck(name="entitlement_ok", passed=False, detail="unsupported_provider"),
@@ -115,17 +115,6 @@ def _claude_subscription_checks(candidate: RoleCandidate) -> list[PreflightCheck
         PreflightCheck(name="entitlement_ok", passed=entitled, detail=detail_value),
         PreflightCheck(name="noninteractive_ok", passed=noninteractive, detail=detail_value),
     ]
-
-
-def _grok_subscription_checks() -> list[PreflightCheck]:
-    detail = "unsupported_noninteractive_status"
-    return [
-        PreflightCheck(name="login_ok", passed=False, detail=detail),
-        PreflightCheck(name="entitlement_ok", passed=False, detail=detail),
-        PreflightCheck(name="noninteractive_ok", passed=False, detail=detail),
-    ]
-
-
 def _run_status_command(command: list[str]) -> tuple[int, str, str]:
     try:
         result = subprocess.run(

@@ -26,7 +26,8 @@ python3 -m patchrail.cli list preflight-snapshots
 `real` preset の subscription preflight は現在こう動きます。
 - `codex`: `codex login status`
 - `claude`: `claude auth status`
-- `grok`: 現行統合では non-interactive status が安定していないため blocked 扱い
+
+`grok` は現在 API-only です。default policy には `grok subscription` 候補を入れていません。
 
 `real` preset の API 候補は標準的な credential env を使います。
 - `codex`: `OPENAI_API_KEY`

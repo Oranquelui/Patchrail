@@ -142,7 +142,11 @@ class PatchrailApp:
         assignment_selection = self._require_assignment(task, role=Role.EXECUTOR, resolution=resolution)
         run_id = generate_id("run")
         workspace_path = self._prepare_workspace(run_id=run_id, task=task, plan=plan)
-        if resolution.selected_candidate and resolution.selected_candidate.access_mode == AccessMode.API:
+        if (
+            resolution.selected_candidate
+            and resolution.selected_candidate.access_mode == AccessMode.API
+            and not resolution.selected_candidate.simulation
+        ):
             runner = build_api_runner(resolution.selected_candidate, runner_name)
         else:
             runner = build_runner(runner_name, command=assignment_selection.command)

@@ -86,7 +86,8 @@ Preflight checks:
 `real` preset subscription behavior:
 - `codex subscription`: `codex login status`
 - `claude subscription`: `claude auth status`
-- `grok subscription`: currently blocked because Patchrail does not yet treat Grok CLI auth status as a reliable non-interactive contract
+
+`grok` is API-only in the default policy set. Patchrail does not currently ship a default `grok subscription` candidate because the CLI contract is not yet stable enough for supervised runtime use.
 
 The default `local` policy intentionally uses simulation-backed subscription candidates so the ontology and approval rules can be tested without live provider credentials. The `real` preset switches readiness truthfulness on without changing executor output generation yet.
 
