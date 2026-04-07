@@ -57,6 +57,10 @@ Task summary states for the MVP:
 ## Policy And Preflight Model
 Role policy is stored locally under `.patchrail/config/role-policy.json`.
 
+Config presets:
+- `local`: simulation-backed role policy for deterministic local testing
+- `real`: live-readiness role policy for Codex, Claude, and Grok API/subscription checks while execution still uses the local harness
+
 Phase flow:
 1. Load the policy set for the requested role.
 2. Filter candidates when the CLI explicitly constrains executor provider, such as `claude_code` or `grok_runner`.
@@ -73,7 +77,12 @@ Preflight checks:
 - `api`: `credential_present`, `endpoint_configured`
 - `subscription`: `cli_present`, `login_ok`, `entitlement_ok`, `noninteractive_ok`
 
-The default local policy intentionally uses simulation-backed subscription candidates so the ontology and approval rules can be tested without live provider credentials.
+`real` preset subscription behavior:
+- `codex subscription`: `codex login status`
+- `claude subscription`: `claude auth status`
+- `grok subscription`: currently blocked because Patchrail does not yet treat Grok CLI auth status as a reliable non-interactive contract
+
+The default `local` policy intentionally uses simulation-backed subscription candidates so the ontology and approval rules can be tested without live provider credentials. The `real` preset switches readiness truthfulness on without changing executor output generation yet.
 
 ## Runner Model
 The runner contract is intentionally narrow:
@@ -129,7 +138,7 @@ Read-side navigation:
 - `patchrail list preflight-snapshots [--task-id <task_id>]`
 
 ## Artifact And Approval Flow
-1. `config init` creates the local role-policy document used for ontology-aware local testing.
+1. `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
 2. `task create` stores a new task and appends a decision trace.
 3. `plan` resolves the planner candidate, stores the plan with preflight evidence, updates the task to `planned`, and appends decision traces.
 4. Every `plan`, `run`, and `review` resolution attempt first writes a standalone `PreflightSnapshot`.

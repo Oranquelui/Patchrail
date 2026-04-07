@@ -7,15 +7,29 @@ Patchrail は、ローカルファーストで supervised な coding-agent contr
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e .
+# deterministic local flow
 python3 -m patchrail.cli config init
 python3 -m patchrail.cli preflight --role planner
+# live readiness checks
+python3 -m patchrail.cli config init --preset real
+python3 -m patchrail.cli preflight --role executor --runner auto
 pytest -q
 sh scripts/local_smoke_test.sh
 python3 -m patchrail.cli list tasks
 python3 -m patchrail.cli list preflight-snapshots
 ```
 
-`config init` は `.patchrail/config/role-policy.json` を作成します。デフォルト設定は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。
+`config init` は `.patchrail/config/role-policy.json` を作成します。デフォルトの `local` preset は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。`config init --preset real` は live-readiness 用の role policy を書き出し、subscription 候補の preflight を実 CLI で確認します。
+
+`real` preset の subscription preflight は現在こう動きます。
+- `codex`: `codex login status`
+- `claude`: `claude auth status`
+- `grok`: 現行統合では non-interactive status が安定していないため blocked 扱い
+
+`real` preset の API 候補は標準的な credential env を使います。
+- `codex`: `OPENAI_API_KEY`
+- `claude`: `ANTHROPIC_API_KEY`
+- `grok`: `XAI_API_KEY`
 
 cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
 

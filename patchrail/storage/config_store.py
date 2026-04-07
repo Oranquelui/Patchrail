@@ -14,8 +14,8 @@ class ConfigStore:
         self.config_path = self.config_dir / "role-policy.json"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-    def init_default(self) -> RolePolicySet:
-        policy = self._default_policy()
+    def init_default(self, preset: str = "local") -> RolePolicySet:
+        policy = self._policy_for_preset(preset)
         self.write_policy(policy)
         return policy
 
@@ -28,7 +28,14 @@ class ConfigStore:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path.write_text(json.dumps(policy.to_dict(), indent=2, sort_keys=True) + "\n")
 
-    def _default_policy(self) -> RolePolicySet:
+    def _policy_for_preset(self, preset: str) -> RolePolicySet:
+        if preset == "local":
+            return self._local_policy()
+        if preset == "real":
+            return self._real_policy()
+        raise ValueError(f"Unsupported preset: {preset}")
+
+    def _local_policy(self) -> RolePolicySet:
         python_bin = sys.executable
         harness_command = f"{python_bin} -m patchrail.runners.local_harness"
 
@@ -183,6 +190,163 @@ class ConfigStore:
                     command=harness_command,
                     api_key_env="PATCHRAIL_GROK_API_KEY",
                     endpoint_env="PATCHRAIL_GROK_API_BASE",
+                ),
+            ],
+        )
+        return RolePolicySet(roles={Role.PLANNER: planner, Role.REVIEWER: reviewer, Role.EXECUTOR: executor})
+
+    def _real_policy(self) -> RolePolicySet:
+        python_bin = sys.executable
+        harness_command = f"{python_bin} -m patchrail.runners.local_harness"
+
+        planner = RolePolicy(
+            role=Role.PLANNER,
+            candidates=[
+                RoleCandidate(
+                    name="claude_subscription_planner",
+                    role=Role.PLANNER,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.PLANNER,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "subscription",
+                            "capabilities": ["planning", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    cli_command="claude",
+                ),
+                RoleCandidate(
+                    name="codex_api_planner",
+                    role=Role.PLANNER,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.PLANNER,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "api",
+                            "capabilities": ["planning", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="OPENAI_API_KEY",
+                ),
+            ],
+        )
+        reviewer = RolePolicy(
+            role=Role.REVIEWER,
+            candidates=[
+                RoleCandidate(
+                    name="codex_subscription_reviewer",
+                    role=Role.REVIEWER,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.REVIEWER,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "subscription",
+                            "capabilities": ["review", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    cli_command="codex",
+                ),
+                RoleCandidate(
+                    name="claude_api_reviewer",
+                    role=Role.REVIEWER,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.REVIEWER,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "api",
+                            "capabilities": ["review", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="ANTHROPIC_API_KEY",
+                ),
+            ],
+        )
+        executor = RolePolicy(
+            role=Role.EXECUTOR,
+            candidates=[
+                RoleCandidate(
+                    name="grok_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.GROK,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "grok",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    cli_command="grok",
+                ),
+                RoleCandidate(
+                    name="claude_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.CLAUDE,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "claude",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    cli_command="claude",
+                ),
+                RoleCandidate(
+                    name="codex_subscription_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.CODEX,
+                    access_mode=AccessMode.SUBSCRIPTION,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "codex",
+                            "access_mode": "subscription",
+                            "capabilities": ["execution", "json_output", "noninteractive"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    cli_command="codex",
+                ),
+                RoleCandidate(
+                    name="grok_api_executor",
+                    role=Role.EXECUTOR,
+                    provider=Provider.GROK,
+                    access_mode=AccessMode.API,
+                    capability_profile=RoleCandidate.from_dict(
+                        Role.EXECUTOR,
+                        {
+                            "name": "temp",
+                            "provider": "grok",
+                            "access_mode": "api",
+                            "capabilities": ["execution", "json_output"],
+                        },
+                    ).capability_profile,
+                    command=harness_command,
+                    api_key_env="XAI_API_KEY",
                 ),
             ],
         )

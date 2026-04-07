@@ -63,9 +63,9 @@ class PatchrailApp:
         self._append_trace(task.id, "task.created", f"Created task {task.id}.", description)
         return {"task": serialize(task)}
 
-    def init_config(self) -> dict[str, Any]:
-        policy = self.config.init_default()
-        return {"config": {"path": str(self.config.config_path), "roles": serialize(policy)}}
+    def init_config(self, preset: str = "local") -> dict[str, Any]:
+        policy = self.config.init_default(preset=preset)
+        return {"config": {"path": str(self.config.config_path), "preset": preset, "roles": serialize(policy)}}
 
     def preflight(self, role_name: str, runner_name: str | None = None) -> dict[str, Any]:
         role = Role(role_name)

@@ -65,6 +65,7 @@ class RoleCandidate:
     access_mode: AccessMode
     capability_profile: CapabilityProfile
     command: str | None = None
+    cli_command: str | None = None
     api_key_env: str | None = None
     endpoint_env: str | None = None
     simulation: bool = False
@@ -78,6 +79,7 @@ class RoleCandidate:
             access_mode=AccessMode(payload["access_mode"]),
             capability_profile=CapabilityProfile.from_capabilities(list(payload.get("capabilities", []))),
             command=payload.get("command"),
+            cli_command=payload.get("cli_command"),
             api_key_env=payload.get("api_key_env"),
             endpoint_env=payload.get("endpoint_env"),
             simulation=bool(payload.get("simulation", False)),
@@ -90,6 +92,7 @@ class RoleCandidate:
             "access_mode": self.access_mode.value,
             "capabilities": self.capability_profile.to_capabilities(),
             "command": self.command,
+            "cli_command": self.cli_command,
             "api_key_env": self.api_key_env,
             "endpoint_env": self.endpoint_env,
             "simulation": self.simulation,

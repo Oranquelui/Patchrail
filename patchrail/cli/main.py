@@ -21,7 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     config_parser = subparsers.add_parser("config")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
-    config_subparsers.add_parser("init")
+    config_init = config_subparsers.add_parser("init")
+    config_init.add_argument("--preset", choices=["local", "real"], default="local")
 
     plan_parser = subparsers.add_parser("plan")
     plan_parser.add_argument("--task-id", required=True)
@@ -93,7 +94,7 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "task" and args.task_command == "create":
         return app.create_task(title=args.title, description=args.description)
     if args.command == "config" and args.config_command == "init":
-        return app.init_config()
+        return app.init_config(preset=args.preset)
     if args.command == "plan":
         return app.create_plan(task_id=args.task_id, summary=args.summary, steps=args.step)
     if args.command == "preflight":

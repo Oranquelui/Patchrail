@@ -36,6 +36,67 @@ def test_config_init_and_preflight_report_role_candidates(
     assert len(preflight_payload["results"]) >= 2
 
 
+def test_config_init_real_preset_writes_live_candidates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, config_payload = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    config_path = Path(config_payload["config"]["path"])
+    config = json.loads(config_path.read_text())
+
+    planner_candidate = config["roles"]["planner"]["candidates"][0]
+    executor_candidate = config["roles"]["executor"]["candidates"][0]
+
+    assert planner_candidate["name"] == "claude_subscription_planner"
+    assert planner_candidate["cli_command"] == "claude"
+    assert planner_candidate["simulation"] is False
+    assert planner_candidate["command"] == f"{sys.executable} -m patchrail.runners.local_harness"
+    assert executor_candidate["name"] == "grok_subscription_executor"
+    assert executor_candidate["cli_command"] == "grok"
+
+
+def test_real_preset_preflight_uses_provider_status_checks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        if command == ["grok", "auth", "status"]:
+            return (0, '{"loggedIn": true}', "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, preflight_payload = run_cli(["preflight", "--role", "executor"], capsys)
+    assert exit_code == 0
+    assert preflight_payload["selected_candidate"]["provider"] == "claude"
+    assert preflight_payload["selected_candidate"]["access_mode"] == "subscription"
+
+    grok_result = preflight_payload["results"][0]
+    noninteractive_check = next(
+        check for check in grok_result["checks"] if check["name"] == "noninteractive_ok"
+    )
+    assert grok_result["candidate_name"] == "grok_subscription_executor"
+    assert grok_result["ready"] is False
+    assert noninteractive_check["passed"] is False
+
+
 def test_plan_review_and_run_persist_resolved_assignments(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

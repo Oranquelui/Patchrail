@@ -12,9 +12,14 @@ pip install -e .
 ```
 2. role policy を初期化し、preflight を確認する。
 ```bash
+# local preset
 python3 -m patchrail.cli config init
 python3 -m patchrail.cli preflight --role planner
 python3 -m patchrail.cli preflight --role reviewer
+python3 -m patchrail.cli preflight --role executor --runner auto
+
+# real preset
+python3 -m patchrail.cli config init --preset real
 python3 -m patchrail.cli preflight --role executor --runner auto
 ```
 3. テストを実行する。
@@ -45,20 +50,31 @@ python3 -m patchrail.cli list preflight-snapshots
 - `review`
 - `approve`
 
-デフォルトの role policy は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。
+デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。
+
+`real` preset を使う場合:
+- `python3 -m patchrail.cli config init --preset real`
+- `codex subscription` は `codex login status` を使う
+- `claude subscription` は `claude auth status` を使う
+- `grok subscription` は現行統合では blocked 扱いになる
 
 API 候補を試す場合は、対応する環境変数を設定する:
-- `PATCHRAIL_CODEX_API_KEY`, `PATCHRAIL_CODEX_API_BASE`
-- `PATCHRAIL_CLAUDE_API_KEY`, `PATCHRAIL_CLAUDE_API_BASE`
-- `PATCHRAIL_GROK_API_KEY`, `PATCHRAIL_GROK_API_BASE`
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `XAI_API_KEY`
 
 ## Manual Flow
 ```bash
 export PATCHRAIL_HOME="$PWD/.patchrail"
 
+# local preset
 python3 -m patchrail.cli config init
 python3 -m patchrail.cli preflight --role planner
 python3 -m patchrail.cli preflight --role reviewer
+python3 -m patchrail.cli preflight --role executor --runner auto
+
+# real preset
+python3 -m patchrail.cli config init --preset real
 python3 -m patchrail.cli preflight --role executor --runner auto
 
 python3 -m patchrail.cli task create \
@@ -92,6 +108,8 @@ python3 -m patchrail.cli status --task-id <task_id>
 python3 -m patchrail.cli approve-fallback --task-id <task_id> --rationale "Allow deviation"
 python3 -m patchrail.cli run --task-id <task_id> --runner auto
 ```
+
+`real` preset では executor の先頭候補が `grok subscription` のため、通常は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
 
 ## Files To Inspect
 - `.patchrail/tasks/`
