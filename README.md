@@ -4,6 +4,7 @@ Patchrail は、ローカルファーストで supervised な coding-agent contr
 
 ## Quickstart
 ```bash
+cd /path/to/Patchrail
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e .
