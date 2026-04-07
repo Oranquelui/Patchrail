@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from patchrail.cli.main import main
+from patchrail.models.entities import CostMetrics
+from patchrail.runners.base import RunnerResult
 
 
 def run_cli(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict[str, object]]:
@@ -276,6 +278,73 @@ def test_real_preset_flow_can_complete_after_fallback_approval(
     )
     assert exit_code == 0
     assert approved["task"]["state"] == "approved"
+
+
+def test_run_can_use_api_executor_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-api"))
+    monkeypatch.setenv("XAI_API_KEY", "test-key")
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    class FakeApiRunner:
+        name = "grok_runner"
+        mode = "api"
+        command = "provider-api:grok"
+
+        def run(self, task, plan, workspace_path, run_id):  # noqa: ANN001
+            return RunnerResult(
+                stdout="api runner stdout\n",
+                stderr="",
+                execution_summary="# API Execution Summary\n",
+                diff_summary="- API diff summary\n",
+                cost_metrics=CostMetrics(
+                    prompt_tokens=21,
+                    completion_tokens=34,
+                    estimated_usd=0.12,
+                    elapsed_seconds=1.5,
+                ),
+                exit_code=0,
+            )
+
+    monkeypatch.setattr("patchrail.core.service.build_api_runner", lambda candidate, runner_name: FakeApiRunner(), raising=False)
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "API path", "--description", "Use executor api path"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, _ = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Plan before api run", "--step", "Plan"],
+        capsys,
+    )
+    assert exit_code == 0
+
+    exit_code, executed = run_cli(
+        ["run", "--task-id", task_id, "--runner", "grok_runner", "--access-mode", "api"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert executed["run"]["resolved_assignment"]["provider"] == "grok"
+    assert executed["run"]["resolved_assignment"]["access_mode"] == "api"
+    assert executed["run"]["runner_assignment"]["mode"] == "api"
+    assert executed["run"]["runner_assignment"]["command"] == "provider-api:grok"
 
 
 def test_list_commands_return_tasks_runs_and_approvals(

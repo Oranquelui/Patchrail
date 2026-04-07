@@ -22,6 +22,9 @@ python3 -m patchrail.cli preflight --role executor --runner auto
 # real preset
 python3 -m patchrail.cli config init --preset real
 python3 -m patchrail.cli preflight --role executor --runner auto
+
+# api executor path
+python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
 ```
 3. テストを実行する。
 ```bash
@@ -70,6 +73,12 @@ API 候補を試す場合は、対応する環境変数を設定する:
 - `ANTHROPIC_API_KEY`
 - `XAI_API_KEY`
 
+API executor の最短手順:
+```bash
+python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
+python3 -m patchrail.cli run --task-id <task_id> --runner grok_runner --access-mode api
+```
+
 ## Manual Flow
 ```bash
 cd /path/to/Patchrail
@@ -84,6 +93,7 @@ python3 -m patchrail.cli preflight --role executor --runner auto
 # real preset
 python3 -m patchrail.cli config init --preset real
 python3 -m patchrail.cli preflight --role executor --runner auto
+python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
 
 python3 -m patchrail.cli task create \
   --title "Manual local test" \
@@ -118,6 +128,8 @@ python3 -m patchrail.cli run --task-id <task_id> --runner auto
 ```
 
 `real` preset では executor の先頭候補が `grok subscription` のため、通常は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
+
+一方で `--runner grok_runner --access-mode api` を使えば、`grok_api_executor` を直接選べる。これは live API path の疎通確認に向いている。
 
 最短の real smoke:
 ```bash

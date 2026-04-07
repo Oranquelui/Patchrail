@@ -37,6 +37,13 @@ python3 -m patchrail.cli list preflight-snapshots
 - `local`: `sh scripts/local_smoke_test.sh`
 - `real`: `PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh`
 
+executor の API path を試す場合は `--access-mode api` を使います。たとえば Grok API executor は次で選べます。
+
+```bash
+python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
+python3 -m patchrail.cli run --task-id <task_id> --runner grok_runner --access-mode api
+```
+
 cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
 
 ローカルストアを直接開かなくても、`patchrail list tasks|plans|runs|reviews|approvals|fallback-requests|preflight-snapshots` で主要レコードを一覧できます。

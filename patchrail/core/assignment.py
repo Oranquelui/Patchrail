@@ -9,6 +9,7 @@ from patchrail.models.roles import (
     Provider,
     ResolvedAssignment,
     Role,
+    RoleCandidate,
     RolePolicySet,
 )
 
@@ -20,6 +21,7 @@ class AssignmentResolution:
     role: Role
     results: list[PreflightResult]
     selected_assignment: ResolvedAssignment | None
+    selected_candidate: RoleCandidate | None
     fallback_event: FallbackEvent | None
 
 
@@ -27,12 +29,24 @@ def resolve_role_assignment(
     policy_set: RolePolicySet,
     role: Role,
     provider_filter: Provider | None = None,
+    access_mode_filter: AccessMode | None = None,
 ) -> AssignmentResolution:
     policy = policy_set.get_policy(role)
-    candidates = [candidate for candidate in policy.candidates if provider_filter is None or candidate.provider == provider_filter]
+    candidates = [
+        candidate
+        for candidate in policy.candidates
+        if (provider_filter is None or candidate.provider == provider_filter)
+        and (access_mode_filter is None or candidate.access_mode == access_mode_filter)
+    ]
     results = [perform_preflight(candidate) for candidate in candidates]
     if not candidates:
-        return AssignmentResolution(role=role, results=[], selected_assignment=None, fallback_event=None)
+        return AssignmentResolution(
+            role=role,
+            results=[],
+            selected_assignment=None,
+            selected_candidate=None,
+            fallback_event=None,
+        )
 
     first_candidate = candidates[0]
     for candidate, result in zip(candidates, results, strict=False):
@@ -55,8 +69,21 @@ def resolve_role_assignment(
             candidate_name=candidate.name,
             provider=candidate.provider,
             access_mode=candidate.access_mode,
-            command=candidate.command,
+            model=candidate.model,
+            command=None if candidate.access_mode == AccessMode.API else candidate.command,
             requires_additional_approval=requires_approval,
         )
-        return AssignmentResolution(role=role, results=results, selected_assignment=assignment, fallback_event=fallback_event)
-    return AssignmentResolution(role=role, results=results, selected_assignment=None, fallback_event=None)
+        return AssignmentResolution(
+            role=role,
+            results=results,
+            selected_assignment=assignment,
+            selected_candidate=candidate,
+            fallback_event=fallback_event,
+        )
+    return AssignmentResolution(
+        role=role,
+        results=results,
+        selected_assignment=None,
+        selected_candidate=None,
+        fallback_event=None,
+    )

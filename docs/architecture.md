@@ -4,11 +4,12 @@
 Patchrail is a local-first control plane that records supervised coding-agent workflows as explicit state transitions. The MVP is a headless core with a thin CLI wrapper. It accepts a task, stores a plan, resolves role assignments through a provider and access-mode policy, records a run, persists an artifact bundle, captures a review result, and requires an explicit human approval or rejection before completion.
 
 ## Core Modules
-- `patchrail.cli`: `argparse`-based command surface for task, config, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands.
+- `patchrail.cli`: `argparse`-based command surface for task, config, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands, including explicit `access_mode` filters for executor testing.
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
 - `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
 - `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, and artifact lookup.
-- `patchrail.runners`: runner interface and shell-backed local harness execution, ready to host `codex`, `claude`, and `grok` adapters.
+- `patchrail.runners`: runner interface, shell-backed local harness execution, and API-backed executor runners for supported providers.
+- `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls.
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
 - `patchrail.approval`: explicit task approval and fallback approval request handling plus ledger appends.
 - `patchrail.artifacts`: artifact bundle creation and lookup.
@@ -27,6 +28,10 @@ Core ontology terms:
 - `PreflightResult`: readiness checks for a candidate
 - `ResolvedAssignment`: the concrete candidate selected at phase start
 - `FallbackEvent`: an auditable record of primary-candidate failure and fallback selection
+
+Candidate details may also include:
+- `model`: the provider model to use for API-backed execution
+- `cli_command`: the executable used for subscription health checks
 
 Hard rules:
 - `Codex` remains the fixed supervisor.
@@ -64,14 +69,15 @@ Config presets:
 Phase flow:
 1. Load the policy set for the requested role.
 2. Filter candidates when the CLI explicitly constrains executor provider, such as `claude_code` or `grok_runner`.
-3. Run preflight for each candidate.
-4. Select the first ready candidate.
-5. If the selected candidate differs from the primary candidate:
+3. Filter candidates further when the CLI explicitly constrains `access_mode`, such as `--access-mode api`.
+4. Run preflight for each candidate.
+5. Select the first ready candidate.
+6. If the selected candidate differs from the primary candidate:
    - same `provider` and same `access_mode`: auto-permitted fallback
    - different `provider` or different `access_mode`: blocked until additional approval exists
-6. Persist the `ResolvedAssignment`, `PreflightResult` list, and optional `FallbackEvent` into the plan, review, or run record.
-7. If blocked, create a `FallbackApprovalRequest` and require `approve-fallback` or `reject-fallback` before retry.
-8. Persist a standalone `PreflightSnapshot` for each `plan`, `run`, and `review` resolution attempt before the phase continues or fails.
+7. Persist the `ResolvedAssignment`, `PreflightResult` list, and optional `FallbackEvent` into the plan, review, or run record.
+8. If blocked, create a `FallbackApprovalRequest` and require `approve-fallback` or `reject-fallback` before retry.
+9. Persist a standalone `PreflightSnapshot` for each `plan`, `run`, and `review` resolution attempt before the phase continues or fails.
 
 Preflight checks:
 - `api`: `credential_present`, `endpoint_configured`
@@ -95,10 +101,15 @@ The runner contract is intentionally narrow:
 Current adapter behavior:
 - `claude_code`, `grok_runner`, `codex_runner`, and `auto` are CLI entrypoints into the executor phase.
 - The selected executor candidate supplies the concrete command when a shell-backed path is used.
+- When the selected executor candidate uses `access_mode=api`, Patchrail routes the run through a provider HTTP adapter instead of the local harness.
 - Shell mode receives `PATCHRAIL_TASK_FILE`, `PATCHRAIL_PLAN_FILE`, `PATCHRAIL_OUTPUT_FILE`, `PATCHRAIL_RUN_ID`, and `PATCHRAIL_RUNNER_NAME`.
 - `patchrail.runners.local_harness` is the built-in shell target for local end-to-end testing.
+- API mode currently supports:
+  - `codex api` via OpenAI Responses API
+  - `claude api` via Anthropic Messages API
+  - `grok api` via xAI Chat Completions API
 
-Real provider integrations are deferred until the state machine, storage layout, and approval boundary are stable.
+Subscription CLI execution remains deferred until the non-interactive contracts are stable enough to trust in the core runtime.
 
 ## Storage Layout
 Default root: `.patchrail/`

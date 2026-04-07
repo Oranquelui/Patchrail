@@ -64,6 +64,7 @@ class RoleCandidate:
     provider: Provider
     access_mode: AccessMode
     capability_profile: CapabilityProfile
+    model: str | None = None
     command: str | None = None
     cli_command: str | None = None
     api_key_env: str | None = None
@@ -78,6 +79,7 @@ class RoleCandidate:
             provider=Provider(payload["provider"]),
             access_mode=AccessMode(payload["access_mode"]),
             capability_profile=CapabilityProfile.from_capabilities(list(payload.get("capabilities", []))),
+            model=payload.get("model"),
             command=payload.get("command"),
             cli_command=payload.get("cli_command"),
             api_key_env=payload.get("api_key_env"),
@@ -91,6 +93,7 @@ class RoleCandidate:
             "provider": self.provider.value,
             "access_mode": self.access_mode.value,
             "capabilities": self.capability_profile.to_capabilities(),
+            "model": self.model,
             "command": self.command,
             "cli_command": self.cli_command,
             "api_key_env": self.api_key_env,
@@ -193,6 +196,7 @@ class ResolvedAssignment:
     candidate_name: str
     provider: Provider
     access_mode: AccessMode
+    model: str | None
     command: str | None
     requires_additional_approval: bool = False
 
@@ -203,6 +207,7 @@ class ResolvedAssignment:
             candidate_name=payload["candidate_name"],
             provider=Provider(payload["provider"]),
             access_mode=AccessMode(payload["access_mode"]),
+            model=payload.get("model"),
             command=payload.get("command"),
             requires_additional_approval=bool(payload.get("requires_additional_approval", False)),
         )

@@ -97,6 +97,33 @@ def test_real_preset_preflight_uses_provider_status_checks(
     assert noninteractive_check["passed"] is False
 
 
+def test_preflight_can_filter_by_access_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+    monkeypatch.setenv("XAI_API_KEY", "test-key")
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+    monkeypatch.setattr(
+        "patchrail.core.preflight._run_status_command",
+        lambda command: (0, '{"loggedIn": true, "subscriptionType": "pro"}', ""),
+        raising=False,
+    )
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, preflight_payload = run_cli(
+        ["preflight", "--role", "executor", "--runner", "grok_runner", "--access-mode", "api"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert preflight_payload["selected_candidate"]["provider"] == "grok"
+    assert preflight_payload["selected_candidate"]["access_mode"] == "api"
+    assert len(preflight_payload["results"]) == 1
+
+
 def test_plan_review_and_run_persist_resolved_assignments(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -28,8 +28,9 @@ from patchrail.models.entities import (
     TaskState,
     serialize,
 )
-from patchrail.models.roles import Provider, Role
+from patchrail.models.roles import AccessMode, Provider, Role
 from patchrail.review.service import ReviewService
+from patchrail.runners.api import build_api_runner
 from patchrail.runners.stub import build_runner
 from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
@@ -67,10 +68,20 @@ class PatchrailApp:
         policy = self.config.init_default(preset=preset)
         return {"config": {"path": str(self.config.config_path), "preset": preset, "roles": serialize(policy)}}
 
-    def preflight(self, role_name: str, runner_name: str | None = None) -> dict[str, Any]:
+    def preflight(
+        self,
+        role_name: str,
+        runner_name: str | None = None,
+        access_mode_name: str = "auto",
+    ) -> dict[str, Any]:
         role = Role(role_name)
         provider_filter = self._provider_filter_for_role(role=role, runner_name=runner_name)
-        resolution = resolve_role_assignment(self.config.load_policy(), role=role, provider_filter=provider_filter)
+        resolution = resolve_role_assignment(
+            self.config.load_policy(),
+            role=role,
+            provider_filter=provider_filter,
+            access_mode_filter=self._access_mode_filter(access_mode_name),
+        )
         return {
             "role": role.value,
             "selected_candidate": serialize(resolution.selected_assignment) if resolution.selected_assignment else None,
@@ -114,7 +125,7 @@ class PatchrailApp:
         )
         return {"plan": serialize(plan), "task": serialize(task)}
 
-    def run_task(self, task_id: str, runner_name: str) -> dict[str, Any]:
+    def run_task(self, task_id: str, runner_name: str, access_mode_name: str = "auto") -> dict[str, Any]:
         task = self.store.load_task(task_id)
         require_state(task, TaskState.PLANNED, "run a task")
         if task.plan_id is None:
@@ -125,12 +136,16 @@ class PatchrailApp:
             self.config.load_policy(),
             role=Role.EXECUTOR,
             provider_filter=self._provider_filter_for_role(role=Role.EXECUTOR, runner_name=runner_name),
+            access_mode_filter=self._access_mode_filter(access_mode_name),
         )
         self._record_preflight_snapshot(task.id, phase=PreflightPhase.RUN, role=Role.EXECUTOR, resolution=resolution)
         assignment_selection = self._require_assignment(task, role=Role.EXECUTOR, resolution=resolution)
         run_id = generate_id("run")
         workspace_path = self._prepare_workspace(run_id=run_id, task=task, plan=plan)
-        runner = build_runner(runner_name, command=assignment_selection.command)
+        if resolution.selected_candidate and resolution.selected_candidate.access_mode == AccessMode.API:
+            runner = build_api_runner(resolution.selected_candidate, runner_name)
+        else:
+            runner = build_runner(runner_name, command=assignment_selection.command)
         assignment = RunnerAssignment(
             runner_name=runner_name,
             mode=runner.mode,
@@ -391,6 +406,11 @@ class PatchrailApp:
             "codex_runner": Provider.CODEX,
         }
         return mapping.get(runner_name)
+
+    def _access_mode_filter(self, access_mode_name: str | None) -> AccessMode | None:
+        if access_mode_name in (None, "auto"):
+            return None
+        return AccessMode(access_mode_name)
 
     def _require_assignment(self, task: Task, role: Role, resolution: Any) -> Any:
         if resolution.selected_assignment is None:

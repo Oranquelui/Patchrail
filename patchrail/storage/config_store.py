@@ -64,6 +64,7 @@ class ConfigStore:
                     role=Role.PLANNER,
                     provider=Provider.CODEX,
                     access_mode=AccessMode.API,
+                    model="gpt-5.2-codex",
                     capability_profile=RoleCandidate.from_dict(
                         Role.PLANNER,
                         {
@@ -104,6 +105,7 @@ class ConfigStore:
                     role=Role.REVIEWER,
                     provider=Provider.CLAUDE,
                     access_mode=AccessMode.API,
+                    model="claude-sonnet-4-20250514",
                     capability_profile=RoleCandidate.from_dict(
                         Role.REVIEWER,
                         {
@@ -178,6 +180,7 @@ class ConfigStore:
                     role=Role.EXECUTOR,
                     provider=Provider.GROK,
                     access_mode=AccessMode.API,
+                    model="grok-4-0709",
                     capability_profile=RoleCandidate.from_dict(
                         Role.EXECUTOR,
                         {
@@ -224,6 +227,7 @@ class ConfigStore:
                     role=Role.PLANNER,
                     provider=Provider.CODEX,
                     access_mode=AccessMode.API,
+                    model="gpt-5.2-codex",
                     capability_profile=RoleCandidate.from_dict(
                         Role.PLANNER,
                         {
@@ -263,6 +267,7 @@ class ConfigStore:
                     role=Role.REVIEWER,
                     provider=Provider.CLAUDE,
                     access_mode=AccessMode.API,
+                    model="claude-sonnet-4-20250514",
                     capability_profile=RoleCandidate.from_dict(
                         Role.REVIEWER,
                         {
@@ -336,6 +341,7 @@ class ConfigStore:
                     role=Role.EXECUTOR,
                     provider=Provider.GROK,
                     access_mode=AccessMode.API,
+                    model="grok-4-0709",
                     capability_profile=RoleCandidate.from_dict(
                         Role.EXECUTOR,
                         {

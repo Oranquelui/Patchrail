@@ -32,10 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_parser = subparsers.add_parser("preflight")
     preflight_parser.add_argument("--role", choices=["planner", "reviewer", "executor"], required=True)
     preflight_parser.add_argument("--runner", choices=["claude_code", "grok_runner", "codex_runner", "auto"])
+    preflight_parser.add_argument("--access-mode", choices=["api", "subscription", "auto"], default="auto")
 
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--task-id", required=True)
     run_parser.add_argument("--runner", choices=["claude_code", "grok_runner", "codex_runner", "auto"], required=True)
+    run_parser.add_argument("--access-mode", choices=["api", "subscription", "auto"], default="auto")
 
     status_parser = subparsers.add_parser("status")
     status_group = status_parser.add_mutually_exclusive_group(required=True)
@@ -98,9 +100,9 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "plan":
         return app.create_plan(task_id=args.task_id, summary=args.summary, steps=args.step)
     if args.command == "preflight":
-        return app.preflight(role_name=args.role, runner_name=args.runner)
+        return app.preflight(role_name=args.role, runner_name=args.runner, access_mode_name=args.access_mode)
     if args.command == "run":
-        return app.run_task(task_id=args.task_id, runner_name=args.runner)
+        return app.run_task(task_id=args.task_id, runner_name=args.runner, access_mode_name=args.access_mode)
     if args.command == "status":
         return app.get_status(task_id=args.task_id, run_id=args.run_id)
     if args.command == "review":
