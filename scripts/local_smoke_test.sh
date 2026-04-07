@@ -6,8 +6,23 @@ cd "$ROOT_DIR"
 
 PYTHON_BIN=${PYTHON_BIN:-python3}
 PATCHRAIL_HOME=${PATCHRAIL_HOME:-"$ROOT_DIR/.patchrail"}
+PATCHRAIL_CONFIG_PRESET=${PATCHRAIL_CONFIG_PRESET:-local}
+PATCHRAIL_RUNNER=${PATCHRAIL_RUNNER:-auto}
+PATCHRAIL_AUTO_APPROVE_FALLBACK=${PATCHRAIL_AUTO_APPROVE_FALLBACK:-}
+
+if [ -z "$PATCHRAIL_AUTO_APPROVE_FALLBACK" ]; then
+  if [ "$PATCHRAIL_CONFIG_PRESET" = "real" ]; then
+    PATCHRAIL_AUTO_APPROVE_FALLBACK=1
+  else
+    PATCHRAIL_AUTO_APPROVE_FALLBACK=0
+  fi
+fi
 
 export PATCHRAIL_HOME
+
+run_patchrail() {
+  "$PYTHON_BIN" -m patchrail.cli "$@"
+}
 
 json_query() {
   "$PYTHON_BIN" -c '
@@ -21,36 +36,83 @@ print(data)
 ' "$@"
 }
 
-"$PYTHON_BIN" -m patchrail.cli config init >/dev/null
-"$PYTHON_BIN" -m patchrail.cli preflight --role planner >/dev/null
-"$PYTHON_BIN" -m patchrail.cli preflight --role reviewer >/dev/null
-"$PYTHON_BIN" -m patchrail.cli preflight --role executor --runner auto >/dev/null
+json_query_optional() {
+  "$PYTHON_BIN" -c '
+import json
+import sys
 
-create_output=$("$PYTHON_BIN" -m patchrail.cli task create \
+data = json.load(sys.stdin)
+try:
+    for key in sys.argv[1:]:
+        data = data[key]
+except Exception:
+    sys.exit(1)
+if data is None:
+    sys.exit(1)
+print(data)
+' "$@"
+}
+
+run_patchrail config init --preset "$PATCHRAIL_CONFIG_PRESET" >/dev/null
+run_patchrail preflight --role planner >/dev/null
+run_patchrail preflight --role reviewer >/dev/null
+run_patchrail preflight --role executor --runner "$PATCHRAIL_RUNNER" >/dev/null
+
+create_output=$(run_patchrail task create \
   --title "Local Smoke Test" \
   --description "Exercise the local Patchrail flow")
 task_id=$(printf '%s' "$create_output" | json_query task id)
 
-"$PYTHON_BIN" -m patchrail.cli plan \
+run_patchrail plan \
   --task-id "$task_id" \
   --summary "Run the local smoke harness" \
   --step "Resolve planner candidate" \
   --step "Execute local runner" >/dev/null
 
-run_output=$("$PYTHON_BIN" -m patchrail.cli run --task-id "$task_id" --runner auto)
+set +e
+run_output=$(run_patchrail run --task-id "$task_id" --runner "$PATCHRAIL_RUNNER" 2>&1)
+run_status=$?
+set -e
+
+fallback_approved=0
+if [ "$run_status" -ne 0 ]; then
+  if [ "$PATCHRAIL_AUTO_APPROVE_FALLBACK" = "1" ]; then
+    status_output=$(run_patchrail status --task-id "$task_id")
+    if request_status=$(printf '%s' "$status_output" | json_query_optional latest_fallback_request status); then
+      if [ "$request_status" = "pending" ]; then
+        run_patchrail approve-fallback \
+          --task-id "$task_id" \
+          --rationale "Auto-approve smoke fallback for preset $PATCHRAIL_CONFIG_PRESET" >/dev/null
+        fallback_approved=1
+        run_output=$(run_patchrail run --task-id "$task_id" --runner "$PATCHRAIL_RUNNER")
+      else
+        printf '%s\n' "$run_output" >&2
+        exit "$run_status"
+      fi
+    else
+      printf '%s\n' "$run_output" >&2
+      exit "$run_status"
+    fi
+  else
+    printf '%s\n' "$run_output" >&2
+    exit "$run_status"
+  fi
+fi
+
 run_id=$(printf '%s' "$run_output" | json_query run id)
 
-"$PYTHON_BIN" -m patchrail.cli review \
+run_patchrail review \
   --run-id "$run_id" \
   --verdict pass \
   --summary "Local smoke run reviewed" >/dev/null
 
-"$PYTHON_BIN" -m patchrail.cli approve \
+run_patchrail approve \
   --task-id "$task_id" \
   --rationale "Local smoke flow passed" >/dev/null
 
-status_output=$("$PYTHON_BIN" -m patchrail.cli status --task-id "$task_id")
+status_output=$(run_patchrail status --task-id "$task_id")
 final_state=$(printf '%s' "$status_output" | json_query task state)
 
-printf 'Local smoke flow completed: task=%s run=%s state=%s\n' "$task_id" "$run_id" "$final_state"
+printf 'Local smoke flow completed: preset=%s task=%s run=%s state=%s fallback_approved=%s\n' \
+  "$PATCHRAIL_CONFIG_PRESET" "$task_id" "$run_id" "$final_state" "$fallback_approved"
 printf 'PATCHRAIL_HOME=%s\n' "$PATCHRAIL_HOME"

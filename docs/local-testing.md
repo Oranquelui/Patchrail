@@ -29,6 +29,7 @@ pytest -q
 4. smoke flow を実行する。
 ```bash
 sh scripts/local_smoke_test.sh
+PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
 ```
 5. 保存済みレコードを一覧する。
 ```bash
@@ -49,6 +50,11 @@ python3 -m patchrail.cli list preflight-snapshots
 - `run --runner auto`
 - `review`
 - `approve`
+
+利用可能な環境変数:
+- `PATCHRAIL_CONFIG_PRESET=local|real`
+- `PATCHRAIL_RUNNER=auto|claude_code|grok_runner|codex_runner`
+- `PATCHRAIL_AUTO_APPROVE_FALLBACK=0|1`
 
 デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。
 
@@ -110,6 +116,14 @@ python3 -m patchrail.cli run --task-id <task_id> --runner auto
 ```
 
 `real` preset では executor の先頭候補が `grok subscription` のため、通常は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
+
+最短の real smoke:
+```bash
+PATCHRAIL_HOME="$PWD/.patchrail-real" \
+PATCHRAIL_CONFIG_PRESET=real \
+PATCHRAIL_AUTO_APPROVE_FALLBACK=1 \
+sh scripts/local_smoke_test.sh
+```
 
 ## Files To Inspect
 - `.patchrail/tasks/`

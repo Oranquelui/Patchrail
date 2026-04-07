@@ -15,6 +15,7 @@ python3 -m patchrail.cli config init --preset real
 python3 -m patchrail.cli preflight --role executor --runner auto
 pytest -q
 sh scripts/local_smoke_test.sh
+PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
 python3 -m patchrail.cli list tasks
 python3 -m patchrail.cli list preflight-snapshots
 ```
@@ -30,6 +31,10 @@ python3 -m patchrail.cli list preflight-snapshots
 - `codex`: `OPENAI_API_KEY`
 - `claude`: `ANTHROPIC_API_KEY`
 - `grok`: `XAI_API_KEY`
+
+`scripts/local_smoke_test.sh` は現在 `local` と `real` の両 preset を扱えます。
+- `local`: `sh scripts/local_smoke_test.sh`
+- `real`: `PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh`
 
 cross-provider または cross-access-mode の fallback が必要になった場合、Patchrail は fallback request を自動生成し、`patchrail approve-fallback --task-id ...` または `patchrail reject-fallback --task-id ...` で明示決定を要求します。
 

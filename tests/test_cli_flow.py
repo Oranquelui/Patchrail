@@ -211,6 +211,73 @@ def test_local_smoke_script_completes_full_flow(tmp_path: Path) -> None:
     assert patchrail_home.exists()
 
 
+def test_real_preset_flow_can_complete_after_fallback_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-real"))
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Real preset smoke", "--description", "Exercise live readiness flow"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Use real preset", "--step", "Resolve planner"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert planned["plan"]["resolved_assignment"]["provider"] == "claude"
+
+    exit_code = main(["run", "--task-id", task_id, "--runner", "auto"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "approve-fallback" in captured.err
+
+    exit_code, fallback_payload = run_cli(
+        ["approve-fallback", "--task-id", task_id, "--rationale", "Allow real preset executor fallback"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert fallback_payload["fallback_request"]["status"] == "approved"
+
+    exit_code, executed = run_cli(["run", "--task-id", task_id, "--runner", "auto"], capsys)
+    assert exit_code == 0
+    run_id = executed["run"]["id"]
+    assert executed["run"]["resolved_assignment"]["provider"] == "claude"
+    assert executed["run"]["fallback_event"]["selected_candidate"] == "claude_subscription_executor"
+
+    exit_code, reviewed = run_cli(
+        ["review", "--run-id", run_id, "--verdict", "pass", "--summary", "Reviewed under real preset"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert reviewed["review"]["resolved_assignment"]["provider"] == "codex"
+
+    exit_code, approved = run_cli(
+        ["approve", "--task-id", task_id, "--rationale", "Real preset local flow passed"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert approved["task"]["state"] == "approved"
+
+
 def test_list_commands_return_tasks_runs_and_approvals(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

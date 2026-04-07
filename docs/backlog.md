@@ -24,5 +24,5 @@
 5. Convert hook placeholders into event subscribers after approval and audit semantics are stable.
 
 ## Iteration Review
-- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path, a first role ontology with local and real role-policy presets, provider-aware preflight checks, an explicit fallback approval request path, standalone preflight snapshots, and list-oriented CLI navigation for the main local records.
+- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path for both `local` and `real` presets, a first role ontology with local and real role-policy presets, provider-aware preflight checks, an explicit fallback approval request path, standalone preflight snapshots, and list-oriented CLI navigation for the main local records.
 - The next session should preserve the current ontology and approval boundaries while improving real provider adapters, provenance, and richer read-side filtering instead of broadening scope.
