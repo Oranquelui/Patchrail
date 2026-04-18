@@ -191,7 +191,6 @@ class PatchrailApp:
             resolution.selected_candidate
             and resolution.selected_candidate.access_mode == AccessMode.SUBSCRIPTION
             and not resolution.selected_candidate.simulation
-            and resolution.selected_candidate.provider == Provider.CLAUDE
         ):
             runner = build_subscription_runner(resolution.selected_candidate, runner_name)
         else:

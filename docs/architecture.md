@@ -105,7 +105,7 @@ Current adapter behavior:
 - `claude_code`, `grok_runner`, `codex_runner`, and `auto` are CLI entrypoints into the executor phase.
 - The selected executor candidate supplies the concrete command when a shell-backed path is used.
 - When the selected executor candidate uses `access_mode=api`, Patchrail routes the run through a provider HTTP adapter instead of the local harness.
-- When the selected executor candidate uses `access_mode=subscription` and provider `claude`, Patchrail routes the run through a Claude CLI print-mode adapter.
+- When the selected executor candidate uses `access_mode=subscription`, Patchrail routes the run through a provider-specific subscription adapter instead of the local harness.
 - Shell mode receives `PATCHRAIL_TASK_FILE`, `PATCHRAIL_PLAN_FILE`, `PATCHRAIL_OUTPUT_FILE`, `PATCHRAIL_RUN_ID`, and `PATCHRAIL_RUNNER_NAME`.
 - `patchrail.runners.local_harness` is the built-in shell target for local end-to-end testing.
 - API mode currently supports:
@@ -113,9 +113,8 @@ Current adapter behavior:
   - `claude api` via Anthropic Messages API
   - `grok api` via xAI Chat Completions API
 - Subscription mode currently supports:
+  - `codex subscription` via `codex exec --json --output-last-message ...`
   - `claude subscription` via `claude -p --output-format json`
-
-`codex subscription` execution remains deferred until the non-interactive runtime path is stable enough to trust in the core runtime.
 
 Planner / reviewer automation:
 - `plan --auto` and `review --auto` resolve their candidates in the core service, then delegate content generation through the `WorkflowEngine` contract.
@@ -128,6 +127,7 @@ Planner / reviewer automation:
 - Live workflow generation currently supports:
   - planner: `claude subscription`, `codex api`
   - reviewer: `claude api`
+- `codex subscription` is currently an executor-only live path. Planner / reviewer auto workflows do not delegate to Codex subscription yet.
 - Unsupported live candidates fail loudly instead of silently downgrading to manual or stub behavior.
 
 ## Storage Layout

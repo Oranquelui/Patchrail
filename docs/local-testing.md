@@ -95,6 +95,12 @@ python3 -m patchrail.cli preflight --role executor --runner claude_code --access
 python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
 ```
 
+Codex subscription executor の最短手順:
+```bash
+python3 -m patchrail.cli preflight --role executor --runner codex_runner --access-mode subscription
+python3 -m patchrail.cli run --task-id <task_id> --runner codex_runner --access-mode subscription
+```
+
 Auto planner / reviewer の最短手順:
 ```bash
 python3 -m patchrail.cli config init --workflow-backend local
@@ -175,6 +181,8 @@ python3 -m patchrail.cli run --task-id <task_id> --runner auto
 一方で `--runner grok_runner --access-mode api` を使えば、`grok_api_executor` を直接選べる。これは live API path の疎通確認に向いている。
 
 `--runner claude_code --access-mode subscription` を使えば、`claude_subscription_executor` を直接選べる。これは live subscription path の疎通確認に向いている。
+
+`--runner codex_runner --access-mode subscription` を使えば、`codex_subscription_executor` を直接選べる。workspace 非 git directory でも `codex exec --skip-git-repo-check` 経由で supervised execution を試せる。
 
 最短の real smoke:
 ```bash

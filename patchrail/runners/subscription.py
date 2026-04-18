@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
 from patchrail.core.exceptions import PatchrailError
@@ -45,7 +46,7 @@ class ClaudeSubscriptionRunner(Runner):
         result_text = payload.get("result")
         if not isinstance(result_text, str) or not result_text.strip():
             raise PatchrailError("Claude subscription runner returned no result text.")
-        response = _parse_execution_json(result_text)
+        response = _parse_execution_json(result_text, provider_label="Claude subscription")
         usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
         total_cost = payload.get("total_cost_usd")
         return RunnerResult(
@@ -63,9 +64,67 @@ class ClaudeSubscriptionRunner(Runner):
         )
 
 
+class CodexSubscriptionRunner(Runner):
+    def __init__(self, candidate: RoleCandidate, runner_name: str) -> None:
+        self._candidate = candidate
+        self.name = runner_name
+        self.mode = "subscription"
+        self.command = "provider-subscription:codex"
+
+    def run(self, task: Task, plan: Plan, workspace_path: Path, run_id: str) -> RunnerResult:
+        last_message_path = workspace_path / "codex-last-message.txt"
+        command = [
+            self._candidate.cli_command or "codex",
+            "exec",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "workspace-write",
+            "--json",
+            "--output-last-message",
+            str(last_message_path),
+            "-",
+        ]
+        if self._candidate.model:
+            command[2:2] = ["--model", self._candidate.model]
+        started_at = time.monotonic()
+        completed = subprocess.run(
+            command,
+            input=_execution_prompt(task, plan),
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            check=False,
+        )
+        elapsed_seconds = round(time.monotonic() - started_at, 3)
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise PatchrailError(f"Codex subscription runner failed: {detail}")
+        if not last_message_path.exists():
+            raise PatchrailError("Codex subscription runner produced no final message.")
+        result_text = last_message_path.read_text().strip()
+        if not result_text:
+            raise PatchrailError("Codex subscription runner produced an empty final message.")
+        response = _parse_execution_json(result_text, provider_label="Codex subscription")
+        return RunnerResult(
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            execution_summary=response["execution_summary"],
+            diff_summary=response["diff_summary"] + "\n",
+            cost_metrics=CostMetrics(
+                prompt_tokens=0,
+                completion_tokens=0,
+                estimated_usd=0.0,
+                elapsed_seconds=elapsed_seconds,
+            ),
+            exit_code=0,
+        )
+
+
 def build_subscription_runner(candidate: RoleCandidate, runner_name: str) -> Runner:
     if candidate.provider == Provider.CLAUDE:
         return ClaudeSubscriptionRunner(candidate=candidate, runner_name=runner_name)
+    if candidate.provider == Provider.CODEX:
+        return CodexSubscriptionRunner(candidate=candidate, runner_name=runner_name)
     raise PatchrailError(f"Unsupported subscription runner provider '{candidate.provider.value}'.")
 
 
@@ -93,16 +152,16 @@ def _parse_cli_payload(raw: str) -> dict[str, object]:
     return payload
 
 
-def _parse_execution_json(raw_text: str) -> dict[str, str]:
+def _parse_execution_json(raw_text: str, provider_label: str) -> dict[str, str]:
     payload = _load_json(raw_text)
     if not isinstance(payload, dict):
-        raise PatchrailError("Claude subscription result was not valid JSON.")
+        raise PatchrailError(f"{provider_label} result was not valid JSON.")
     execution_summary = payload.get("execution_summary")
     diff_summary = payload.get("diff_summary")
     if not isinstance(execution_summary, str) or not execution_summary.strip():
-        raise PatchrailError("Claude subscription result missing execution_summary.")
+        raise PatchrailError(f"{provider_label} result missing execution_summary.")
     if not isinstance(diff_summary, str) or not diff_summary.strip():
-        raise PatchrailError("Claude subscription result missing diff_summary.")
+        raise PatchrailError(f"{provider_label} result missing diff_summary.")
     return {"execution_summary": execution_summary.strip(), "diff_summary": diff_summary.strip()}
 
 
