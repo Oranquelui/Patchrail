@@ -111,6 +111,8 @@ python3 -m patchrail.cli config init --workflow-backend langgraph
 python3 -m patchrail.cli plan --task-id <task_id> --auto
 ```
 
+成功すると、plan / review JSON に `workflow_backend=langgraph` と `workflow_metadata.node_trace` が残る。現行 MVP の graph は stateless なので、LangGraph の subordinate state は canonical continuation data にはせず、Patchrail record に要約 metadata だけを保存する。
+
 ## Manual Flow
 ```bash
 cd /path/to/Patchrail

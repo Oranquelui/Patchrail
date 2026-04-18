@@ -122,6 +122,7 @@ Planner / reviewer automation:
 - The default backend is `patchrail.workflows.local.LocalWorkflowEngine`, which preserves the current deterministic local simulation and direct provider-completion behavior.
 - `patchrail.workflows.langgraph_backend.LangGraphWorkflowEngine` is optional and subordinate. It may hold backend workflow state, but it does not own the canonical task lifecycle, approval boundary, artifact bundle, approval ledger, or decision trace.
 - Workflow backend selection is CLI-first through `config init --workflow-backend ...`, persisted under `.patchrail/config/workflow-backend.json`, and can be overridden temporarily via `PATCHRAIL_WORKFLOW_BACKEND`.
+- The current LangGraph MVP backend compiles stateless planner/reviewer graphs with explicit `collect -> generate -> validate -> finalize` nodes and returns the executed `node_trace` as auxiliary metadata on the canonical plan/review records.
 - Missing optional LangGraph dependencies fail only when an auto plan/review path tries to initialize that backend.
 - Local preset uses deterministic simulated generation for both planner and reviewer workflows.
 - Live workflow generation currently supports:

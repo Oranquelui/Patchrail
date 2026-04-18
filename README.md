@@ -75,6 +75,12 @@ python3 -m patchrail.cli config init --workflow-backend langgraph
 python3 -m patchrail.cli plan --task-id <task_id> --auto
 ```
 
+現在の LangGraph backend は planner / reviewer に対して stateless な 4-node graph を使います。
+- planner: `collect_plan_context -> generate_plan -> validate_plan -> finalize_plan`
+- reviewer: `collect_review_context -> generate_review -> validate_review -> finalize_review`
+
+各 auto record には `workflow_metadata.node_trace`, `graph_version`, `checkpointer`, `delegate_backend` が補助情報として残ります。
+
 現時点では、auto generation の live support は次です。
 - planner: `claude subscription`, `codex api`
 - reviewer: `claude api`
