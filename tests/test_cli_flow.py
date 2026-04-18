@@ -94,11 +94,26 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     artifact_paths = {name: Path(path) for name, path in bundle["files"].items()}
     for path in artifact_paths.values():
         assert path.exists()
+    artifact_manifest = bundle["artifacts"]
+    assert artifact_manifest["stdout"]["logical_kind"] == "runner_stdout"
+    assert artifact_manifest["stderr"]["logical_kind"] == "runner_stderr"
+    assert artifact_manifest["execution_summary"]["logical_kind"] == "execution_summary"
+    assert artifact_manifest["diff_summary"]["logical_kind"] == "diff_summary"
+    assert artifact_manifest["invocation"]["logical_kind"] == "runner_invocation"
+    assert artifact_manifest["trace"]["logical_kind"] == "runner_trace"
+    assert artifact_manifest["trace"]["collection_status"] == "collected"
+    assert artifact_manifest["trace"]["media_type"] == "application/json"
+    assert len(artifact_manifest["trace"]["sha256"]) == 64
+    assert artifact_manifest["trace"]["size_bytes"] > 0
     assert "invocation" in artifact_paths
     invocation = json.loads(artifact_paths["invocation"].read_text())
     assert invocation["mode"] == "shell"
     assert "patchrail.runners.local_harness" in invocation["command"]
     assert invocation["workspace_path"] == str(workspace_path)
+    trace = json.loads(artifact_paths["trace"].read_text())
+    assert trace["schema_version"] == "patchrail.runner_trace.v1"
+    assert trace["runner_name"] == "claude_code"
+    assert trace["run_id"] == run_id
 
     storage_root = tmp_path / ".patchrail"
     assert (storage_root / "tasks" / f"{task_id}.json").exists()
@@ -194,6 +209,10 @@ def test_builtin_local_runner_module_supports_shell_mode_and_persists_invocation
     invocation = json.loads(invocation_path.read_text())
     assert invocation["mode"] == "shell"
     assert "patchrail.runners.local_harness" in invocation["command"]
+    trace_path = Path(artifacts_payload["artifact_bundle"]["files"]["trace"])
+    trace = json.loads(trace_path.read_text())
+    assert trace["runner_name"] == "grok_runner"
+    assert trace["schema_version"] == "patchrail.runner_trace.v1"
 
 
 def test_local_smoke_script_completes_full_flow(tmp_path: Path) -> None:

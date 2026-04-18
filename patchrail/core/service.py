@@ -232,6 +232,7 @@ class PatchrailApp:
             stdout=result.stdout,
             stderr=result.stderr,
             invocation=invocation,
+            runner_trace=result.runner_trace,
         )
         run = Run(
             id=run_id,

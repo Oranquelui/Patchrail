@@ -74,6 +74,27 @@ class RunnerAssignment:
 
 
 @dataclass(slots=True)
+class ArtifactFile:
+    path: str
+    logical_kind: str
+    media_type: str
+    collection_status: str
+    sha256: str
+    size_bytes: int
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ArtifactFile:
+        return cls(
+            path=payload["path"],
+            logical_kind=payload["logical_kind"],
+            media_type=payload["media_type"],
+            collection_status=payload["collection_status"],
+            sha256=payload["sha256"],
+            size_bytes=int(payload["size_bytes"]),
+        )
+
+
+@dataclass(slots=True)
 class Task:
     id: str
     title: str
@@ -143,6 +164,7 @@ class ArtifactBundle:
     created_at: str
     files: dict[str, str]
     summary: str
+    artifacts: dict[str, ArtifactFile] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> ArtifactBundle:
@@ -150,6 +172,10 @@ class ArtifactBundle:
             run_id=payload["run_id"],
             created_at=payload["created_at"],
             files=dict(payload["files"]),
+            artifacts={
+                name: ArtifactFile.from_dict(item)
+                for name, item in payload.get("artifacts", {}).items()
+            },
             summary=payload["summary"],
         )
 

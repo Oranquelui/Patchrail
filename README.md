@@ -81,6 +81,8 @@ python3 -m patchrail.cli plan --task-id <task_id> --auto
 
 各 auto record には `workflow_metadata.node_trace`, `graph_version`, `checkpointer`, `delegate_backend` が補助情報として残ります。
 
+artifact bundle には path map に加えて manifest-style metadata も残ります。各 artifact entry は `logical_kind`, `media_type`, `collection_status`, `sha256`, `size_bytes` を持ち、runner が structured trace を返した場合は `trace.json` として一緒に保存されます。
+
 現時点では、auto generation の live support は次です。
 - planner: `claude subscription`, `codex api`
 - reviewer: `claude api`

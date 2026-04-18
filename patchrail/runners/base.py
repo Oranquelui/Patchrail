@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from patchrail.models.entities import CostMetrics, Plan, Task
 
@@ -15,6 +16,7 @@ class RunnerResult:
     diff_summary: str
     cost_metrics: CostMetrics
     exit_code: int
+    runner_trace: dict[str, Any] | None = None
 
 
 class Runner(ABC):

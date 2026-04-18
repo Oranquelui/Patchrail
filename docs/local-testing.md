@@ -194,5 +194,6 @@ sh scripts/local_smoke_test.sh
 - `.patchrail/config/role-policy.json`
 - `.patchrail/config/workflow-backend.json`
 - `.patchrail/artifacts/<run_id>/`
+- `.patchrail/artifacts/<run_id>/trace.json`
 - `.patchrail/workspaces/<run_id>/`
 - `.patchrail/ledgers/`

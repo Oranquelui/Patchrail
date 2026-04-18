@@ -40,6 +40,7 @@ class ClaudeCodeRunner(Runner):
                 elapsed_seconds=12.5,
             ),
             exit_code=0,
+            runner_trace=None,
         )
 
 
@@ -73,6 +74,7 @@ class GrokRunner(Runner):
                 elapsed_seconds=9.75,
             ),
             exit_code=0,
+            runner_trace=None,
         )
 
 
@@ -136,6 +138,7 @@ class ShellConfiguredRunner(Runner):
             diff_summary=diff_summary,
             cost_metrics=CostMetrics.from_dict(cost_metrics),
             exit_code=completed.returncode,
+            runner_trace=payload.get("runner_trace") if isinstance(payload.get("runner_trace"), dict) else None,
         )
 
 

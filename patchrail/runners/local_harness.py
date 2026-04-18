@@ -17,6 +17,7 @@ def main() -> int:
     task_file = Path(_require_env("PATCHRAIL_TASK_FILE"))
     plan_file = Path(_require_env("PATCHRAIL_PLAN_FILE"))
     output_file = Path(_require_env("PATCHRAIL_OUTPUT_FILE"))
+    run_id = _require_env("PATCHRAIL_RUN_ID")
     runner_name = os.getenv("PATCHRAIL_RUNNER_NAME", "local_harness")
 
     task = json.loads(task_file.read_text())
@@ -38,6 +39,15 @@ def main() -> int:
             "completion_tokens": 13,
             "estimated_usd": 0.01,
             "elapsed_seconds": 0.2,
+        },
+        "runner_trace": {
+            "schema_version": "patchrail.runner_trace.v1",
+            "runner_name": runner_name,
+            "run_id": run_id,
+            "events": [
+                {"name": "input.loaded", "status": "ok"},
+                {"name": "output.persisted", "status": "ok"},
+            ],
         },
     }
     output_file.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

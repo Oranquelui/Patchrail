@@ -152,6 +152,7 @@ Filesystem layout:
 - `.patchrail/artifacts/<run_id>/execution-summary.md`
 - `.patchrail/artifacts/<run_id>/diff-summary.md`
 - `.patchrail/artifacts/<run_id>/invocation.json`
+- `.patchrail/artifacts/<run_id>/trace.json` when the runner returns structured trace data
 - `.patchrail/workspaces/<run_id>/task.json`
 - `.patchrail/workspaces/<run_id>/plan.json`
 - `.patchrail/workspaces/<run_id>/output.json`
@@ -176,6 +177,8 @@ Read-side navigation:
 5. If role resolution hits a blocked fallback, Patchrail stores a `FallbackApprovalRequest`, appends trace and fallback-approval ledger entries, and stops the phase without mutating the task lifecycle.
 6. `approve-fallback` or `reject-fallback` records the human decision for that deviation request.
 7. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
+   - Artifact bundles now include manifest-style metadata per file, including logical kind, media type, collection status, digest, and byte size.
+   - Runner adapters may also return an optional structured trace, which Patchrail persists as another artifact without giving the runner ownership of the canonical run record.
 8. `review` resolves the reviewer candidate, optionally auto-generates review content through the selected workflow backend, stores the review result with rationale and preflight evidence plus any auxiliary workflow metadata, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
 9. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
 
