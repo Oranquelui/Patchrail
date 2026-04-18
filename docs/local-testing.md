@@ -48,6 +48,7 @@ python3 -m patchrail.cli list reviews
 python3 -m patchrail.cli list approvals
 python3 -m patchrail.cli list fallback-requests
 python3 -m patchrail.cli list preflight-snapshots
+python3 -m patchrail.cli list artifact-bundles --has-trace
 ```
 
 `scripts/local_smoke_test.sh` は以下を自動で行う:
@@ -113,6 +114,13 @@ python3 -m patchrail.cli plan --task-id <task_id> --auto
 
 成功すると、plan / review JSON に `workflow_backend=langgraph` と `workflow_metadata.node_trace` が残る。現行 MVP の graph は stateless なので、LangGraph の subordinate state は canonical continuation data にはせず、Patchrail record に要約 metadata だけを保存する。
 
+artifact metadata を確認する最短手順:
+```bash
+python3 -m patchrail.cli status --task-id <task_id>
+python3 -m patchrail.cli list artifact-bundles --task-id <task_id>
+python3 -m patchrail.cli list artifact-bundles --logical-kind runner_trace --has-trace
+```
+
 ## Manual Flow
 ```bash
 cd /path/to/Patchrail
@@ -145,6 +153,7 @@ python3 -m patchrail.cli approve --task-id <task_id> --rationale "Local test pas
 python3 -m patchrail.cli status --task-id <task_id>
 python3 -m patchrail.cli artifacts --run-id <run_id>
 python3 -m patchrail.cli logs --run-id <run_id>
+python3 -m patchrail.cli list artifact-bundles --task-id <task_id>
 python3 -m patchrail.cli list tasks
 python3 -m patchrail.cli list plans --task-id <task_id>
 python3 -m patchrail.cli list runs --task-id <task_id>

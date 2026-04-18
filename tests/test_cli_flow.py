@@ -81,6 +81,8 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     assert status_payload["latest_run"]["id"] == run_id
     assert status_payload["latest_review"]["id"] == review_id
     assert status_payload["latest_approval"]["id"] == approval_id
+    assert status_payload["latest_artifact_bundle"]["run_id"] == run_id
+    assert status_payload["latest_artifact_bundle"]["artifacts"]["trace"]["logical_kind"] == "runner_trace"
 
     exit_code, logs_payload = run_cli(["logs", "--run-id", run_id], capsys)
     assert exit_code == 0
@@ -774,6 +776,17 @@ def test_list_commands_return_tasks_runs_and_approvals(
     assert exit_code == 0
     assert [approval["id"] for approval in approvals_payload["approvals"]] == [first_approval_id]
     assert approvals_payload["approvals"][0]["review_id"] == reviewed["review"]["id"]
+
+    exit_code, bundles_payload = run_cli(["list", "artifact-bundles", "--task-id", first_task_id], capsys)
+    assert exit_code == 0
+    assert [bundle["run_id"] for bundle in bundles_payload["artifact_bundles"]] == [first_run_id]
+
+    exit_code, trace_bundles_payload = run_cli(
+        ["list", "artifact-bundles", "--logical-kind", "runner_trace", "--has-trace"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert [bundle["run_id"] for bundle in trace_bundles_payload["artifact_bundles"]] == [first_run_id]
 
 
 def test_list_commands_return_plans_and_reviews(

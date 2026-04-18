@@ -91,6 +91,10 @@ def build_parser() -> argparse.ArgumentParser:
     list_fallbacks.add_argument("--task-id")
     list_preflight = list_subparsers.add_parser("preflight-snapshots")
     list_preflight.add_argument("--task-id")
+    list_artifact_bundles = list_subparsers.add_parser("artifact-bundles")
+    list_artifact_bundles.add_argument("--task-id")
+    list_artifact_bundles.add_argument("--logical-kind")
+    list_artifact_bundles.add_argument("--has-trace", action="store_true")
 
     return parser
 
@@ -150,6 +154,12 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
         return app.list_fallback_requests(task_id=args.task_id)
     if args.command == "list" and args.list_command == "preflight-snapshots":
         return app.list_preflight_snapshots(task_id=args.task_id)
+    if args.command == "list" and args.list_command == "artifact-bundles":
+        return app.list_artifact_bundles(
+            task_id=args.task_id,
+            logical_kind=args.logical_kind,
+            has_trace=args.has_trace,
+        )
     raise PatchrailError("Unsupported command.")
 
 

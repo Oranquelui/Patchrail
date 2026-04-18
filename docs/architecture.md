@@ -168,6 +168,8 @@ Read-side navigation:
 - `patchrail list approvals [--task-id <task_id>]`
 - `patchrail list fallback-requests [--task-id <task_id>]`
 - `patchrail list preflight-snapshots [--task-id <task_id>]`
+- `patchrail list artifact-bundles [--task-id <task_id>] [--logical-kind <kind>] [--has-trace]`
+- `patchrail status --task-id <task_id>` also surfaces `latest_artifact_bundle` for the current run when one exists
 
 ## Artifact And Approval Flow
 1. `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
@@ -179,6 +181,7 @@ Read-side navigation:
 7. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
    - Artifact bundles now include manifest-style metadata per file, including logical kind, media type, collection status, digest, and byte size.
    - Runner adapters may also return an optional structured trace, which Patchrail persists as another artifact without giving the runner ownership of the canonical run record.
+   - Read-side lookup stays Patchrail-owned: the latest bundle is exposed through `status`, and historical bundle queries stay under the CLI list surface.
 8. `review` resolves the reviewer candidate, optionally auto-generates review content through the selected workflow backend, stores the review result with rationale and preflight evidence plus any auxiliary workflow metadata, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
 9. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
 

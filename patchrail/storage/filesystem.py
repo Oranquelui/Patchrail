@@ -127,6 +127,13 @@ class FilesystemStore:
     def load_artifact_bundle(self, run_id: str) -> ArtifactBundle:
         return ArtifactBundle.from_dict(self._read_json(self.artifact_dir(run_id) / "bundle.json"))
 
+    def list_artifact_bundles(self) -> list[ArtifactBundle]:
+        bundles = [
+            ArtifactBundle.from_dict(json.loads(path.read_text()))
+            for path in sorted((self.root / "artifacts").glob("*/bundle.json"))
+        ]
+        return sorted(bundles, key=lambda item: item.created_at, reverse=True)
+
     def artifact_dir(self, run_id: str) -> Path:
         return self.root / "artifacts" / run_id
 

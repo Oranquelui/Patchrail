@@ -399,6 +399,7 @@ class PatchrailApp:
             payload["plan"] = serialize(self.store.load_plan(task.plan_id))
         if task.latest_run_id:
             payload["latest_run"] = serialize(self.store.load_run(task.latest_run_id))
+            payload["latest_artifact_bundle"] = serialize(self.store.load_artifact_bundle(task.latest_run_id))
         if task.latest_review_id:
             payload["latest_review"] = serialize(self.store.load_review(task.latest_review_id))
         if task.latest_approval_id:
@@ -455,6 +456,29 @@ class PatchrailApp:
         if task_id is not None:
             snapshots = [snapshot for snapshot in snapshots if snapshot.task_id == task_id]
         return {"preflight_snapshots": serialize(snapshots)}
+
+    def list_artifact_bundles(
+        self,
+        task_id: str | None = None,
+        logical_kind: str | None = None,
+        has_trace: bool = False,
+    ) -> dict[str, Any]:
+        bundles = self.store.list_artifact_bundles()
+        if task_id is not None:
+            bundles = [bundle for bundle in bundles if self.store.load_run(bundle.run_id).task_id == task_id]
+        if logical_kind is not None:
+            bundles = [
+                bundle
+                for bundle in bundles
+                if any(artifact.logical_kind == logical_kind for artifact in bundle.artifacts.values())
+            ]
+        if has_trace:
+            bundles = [
+                bundle
+                for bundle in bundles
+                if any(artifact.logical_kind == "runner_trace" for artifact in bundle.artifacts.values())
+            ]
+        return {"artifact_bundles": serialize(bundles)}
 
     def _append_trace(
         self,
