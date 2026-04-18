@@ -8,11 +8,14 @@ cd /path/to/Patchrail
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e .
+# optional workflow backend
+pip install -e '.[langgraph]'
 # deterministic local flow
 python3 -m patchrail.cli config init
+python3 -m patchrail.cli config init --workflow-backend langgraph
 python3 -m patchrail.cli preflight --role planner
 # live readiness checks
-python3 -m patchrail.cli config init --preset real
+python3 -m patchrail.cli config init --preset real --workflow-backend local
 python3 -m patchrail.cli preflight --role executor --runner auto
 pytest -q
 sh scripts/local_smoke_test.sh
@@ -22,7 +25,7 @@ python3 -m patchrail.cli list tasks
 python3 -m patchrail.cli list preflight-snapshots
 ```
 
-`config init` は `.patchrail/config/role-policy.json` を作成します。デフォルトの `local` preset は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。`config init --preset real` は live-readiness 用の role policy を書き出し、subscription 候補の preflight を実 CLI で確認します。
+`config init` は `.patchrail/config/role-policy.json` と `.patchrail/config/workflow-backend.json` を作成します。デフォルトの `local` preset は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。`config init --preset real` は live-readiness 用の role policy を書き出し、subscription 候補の preflight を実 CLI で確認します。workflow backend は CLI-first に `config init --workflow-backend local|langgraph` で保存し、`PATCHRAIL_WORKFLOW_BACKEND` は一時 override としてだけ使います。
 
 `real` preset の subscription preflight は現在こう動きます。
 - `codex`: `codex login status`
@@ -39,6 +42,7 @@ python3 -m patchrail.cli list preflight-snapshots
 - `local`: `sh scripts/local_smoke_test.sh`
 - `real`: `PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh`
 - `local auto plan/review`: `PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh`
+- `langgraph auto plan/review`: `PATCHRAIL_WORKFLOW_BACKEND=langgraph PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh`
 
 executor の API path を試す場合は `--access-mode api` を使います。たとえば Grok API executor は次で選べます。
 
@@ -57,9 +61,18 @@ python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-m
 planner / reviewer も auto path を持ちます。manual 入力を残したまま、`--auto` で role candidate に生成を任せられます。
 
 ```bash
+python3 -m patchrail.cli config init --workflow-backend local
 python3 -m patchrail.cli plan --task-id <task_id> --auto
 python3 -m patchrail.cli review --run-id <run_id> --auto
 python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
+```
+
+LangGraph を使う場合は optional dependency を入れた上で backend を切り替えます。Patchrail に入るのは LangGraph runtime であり、LangGraph Studio は必須ではありません。Studio は graph 可視化・実行・デバッグ用の UI で、Patchrail の canonical control plane には入りません。
+
+```bash
+pip install -e '.[langgraph]'
+python3 -m patchrail.cli config init --workflow-backend langgraph
+python3 -m patchrail.cli plan --task-id <task_id> --auto
 ```
 
 現時点では、auto generation の live support は次です。

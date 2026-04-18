@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 PYTHON_BIN=${PYTHON_BIN:-python3}
 PATCHRAIL_HOME=${PATCHRAIL_HOME:-"$ROOT_DIR/.patchrail"}
 PATCHRAIL_CONFIG_PRESET=${PATCHRAIL_CONFIG_PRESET:-local}
+PATCHRAIL_WORKFLOW_BACKEND=${PATCHRAIL_WORKFLOW_BACKEND:-local}
 PATCHRAIL_RUNNER=${PATCHRAIL_RUNNER:-auto}
 PATCHRAIL_AUTO_APPROVE_FALLBACK=${PATCHRAIL_AUTO_APPROVE_FALLBACK:-}
 PATCHRAIL_AUTO_PLAN=${PATCHRAIL_AUTO_PLAN:-0}
@@ -57,7 +58,7 @@ print(data)
 ' "$@"
 }
 
-run_patchrail config init --preset "$PATCHRAIL_CONFIG_PRESET" >/dev/null
+run_patchrail config init --preset "$PATCHRAIL_CONFIG_PRESET" --workflow-backend "$PATCHRAIL_WORKFLOW_BACKEND" >/dev/null
 run_patchrail preflight --role planner >/dev/null
 run_patchrail preflight --role reviewer >/dev/null
 run_patchrail preflight --role executor --runner "$PATCHRAIL_RUNNER" >/dev/null
@@ -131,6 +132,6 @@ run_patchrail approve \
 status_output=$(run_patchrail status --task-id "$task_id")
 final_state=$(printf '%s' "$status_output" | json_query task state)
 
-printf 'Local smoke flow completed: preset=%s task=%s run=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s\n' \
-  "$PATCHRAIL_CONFIG_PRESET" "$task_id" "$run_id" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW"
+printf 'Local smoke flow completed: preset=%s workflow_backend=%s task=%s run=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s\n' \
+  "$PATCHRAIL_CONFIG_PRESET" "$PATCHRAIL_WORKFLOW_BACKEND" "$task_id" "$run_id" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW"
 printf 'PATCHRAIL_HOME=%s\n' "$PATCHRAIL_HOME"

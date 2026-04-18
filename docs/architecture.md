@@ -62,6 +62,7 @@ Task summary states for the MVP:
 
 ## Policy And Preflight Model
 Role policy is stored locally under `.patchrail/config/role-policy.json`.
+Workflow backend selection is stored locally under `.patchrail/config/workflow-backend.json`, with `PATCHRAIL_WORKFLOW_BACKEND` reserved as an explicit temporary override.
 
 Config presets:
 - `local`: simulation-backed role policy for deterministic local testing
@@ -120,7 +121,7 @@ Planner / reviewer automation:
 - `plan --auto` and `review --auto` resolve their candidates in the core service, then delegate content generation through the `WorkflowEngine` contract.
 - The default backend is `patchrail.workflows.local.LocalWorkflowEngine`, which preserves the current deterministic local simulation and direct provider-completion behavior.
 - `patchrail.workflows.langgraph_backend.LangGraphWorkflowEngine` is optional and subordinate. It may hold backend workflow state, but it does not own the canonical task lifecycle, approval boundary, artifact bundle, approval ledger, or decision trace.
-- Workflow backend selection is explicit through `PATCHRAIL_WORKFLOW_BACKEND`, which currently supports `local` and `langgraph`.
+- Workflow backend selection is CLI-first through `config init --workflow-backend ...`, persisted under `.patchrail/config/workflow-backend.json`, and can be overridden temporarily via `PATCHRAIL_WORKFLOW_BACKEND`.
 - Missing optional LangGraph dependencies fail only when an auto plan/review path tries to initialize that backend.
 - Local preset uses deterministic simulated generation for both planner and reviewer workflows.
 - Live workflow generation currently supports:
@@ -136,6 +137,7 @@ Configurable root:
 
 Filesystem layout:
 - `.patchrail/config/role-policy.json`
+- `.patchrail/config/workflow-backend.json`
 - `.patchrail/tasks/<task_id>.json`
 - `.patchrail/plans/<plan_id>.json`
 - `.patchrail/runs/<run_id>.json`

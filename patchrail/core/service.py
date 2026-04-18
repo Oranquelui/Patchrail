@@ -67,9 +67,13 @@ class PatchrailApp:
         self._append_trace(task.id, "task.created", f"Created task {task.id}.", description)
         return {"task": serialize(task)}
 
-    def init_config(self, preset: str = "local") -> dict[str, Any]:
-        policy = self.config.init_default(preset=preset)
-        return {"config": {"path": str(self.config.config_path), "preset": preset, "roles": serialize(policy)}}
+    def init_config(self, preset: str = "local", workflow_backend: str = "local") -> dict[str, Any]:
+        policy = self.config.init_default(preset=preset, workflow_backend=workflow_backend)
+        self._workflow_engine_instance = None
+        return {
+            "config": {"path": str(self.config.config_path), "preset": preset, "roles": serialize(policy)},
+            "workflow": {"path": str(self.config.workflow_path), "backend": self.config.load_workflow_backend()},
+        }
 
     def preflight(
         self,

@@ -10,17 +10,19 @@ cd /path/to/Patchrail
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e .
+pip install -e '.[langgraph]'
 ```
 2. role policy を初期化し、preflight を確認する。
 ```bash
 # local preset
 python3 -m patchrail.cli config init
+python3 -m patchrail.cli config init --workflow-backend langgraph
 python3 -m patchrail.cli preflight --role planner
 python3 -m patchrail.cli preflight --role reviewer
 python3 -m patchrail.cli preflight --role executor --runner auto
 
 # real preset
-python3 -m patchrail.cli config init --preset real
+python3 -m patchrail.cli config init --preset real --workflow-backend local
 python3 -m patchrail.cli preflight --role executor --runner auto
 
 # api executor path
@@ -35,6 +37,7 @@ pytest -q
 sh scripts/local_smoke_test.sh
 PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
 PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
+PATCHRAIL_WORKFLOW_BACKEND=langgraph PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
 ```
 5. 保存済みレコードを一覧する。
 ```bash
@@ -58,6 +61,7 @@ python3 -m patchrail.cli list preflight-snapshots
 
 利用可能な環境変数:
 - `PATCHRAIL_CONFIG_PRESET=local|real`
+- `PATCHRAIL_WORKFLOW_BACKEND=local|langgraph`
 - `PATCHRAIL_RUNNER=auto|claude_code|grok_runner|codex_runner`
 - `PATCHRAIL_AUTO_APPROVE_FALLBACK=0|1`
 - `PATCHRAIL_AUTO_PLAN=0|1`
@@ -65,7 +69,7 @@ python3 -m patchrail.cli list preflight-snapshots
 - `PATCHRAIL_AUTO_REVIEW=0|1`
 - `PATCHRAIL_REVIEW_ACCESS_MODE=auto|api|subscription`
 
-デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。
+デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。workflow backend は `config init --workflow-backend local|langgraph` で永続化され、`PATCHRAIL_WORKFLOW_BACKEND` は smoke や一時検証向けの override として使える。
 
 `real` preset を使う場合:
 - `python3 -m patchrail.cli config init --preset real`
@@ -92,11 +96,19 @@ python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-m
 
 Auto planner / reviewer の最短手順:
 ```bash
+python3 -m patchrail.cli config init --workflow-backend local
 python3 -m patchrail.cli plan --task-id <task_id> --auto
 python3 -m patchrail.cli review --run-id <run_id> --auto
 
 # real preset で reviewer を live API path に寄せる場合
 python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
+```
+
+LangGraph backend を試す最短手順:
+```bash
+pip install -e '.[langgraph]'
+python3 -m patchrail.cli config init --workflow-backend langgraph
+python3 -m patchrail.cli plan --task-id <task_id> --auto
 ```
 
 ## Manual Flow
@@ -178,6 +190,7 @@ sh scripts/local_smoke_test.sh
 - `.patchrail/fallback_requests/`
 - `.patchrail/preflight_snapshots/`
 - `.patchrail/config/role-policy.json`
+- `.patchrail/config/workflow-backend.json`
 - `.patchrail/artifacts/<run_id>/`
 - `.patchrail/workspaces/<run_id>/`
 - `.patchrail/ledgers/`

@@ -12,11 +12,13 @@ class ConfigStore:
         self.root = root
         self.config_dir = self.root / "config"
         self.config_path = self.config_dir / "role-policy.json"
+        self.workflow_path = self.config_dir / "workflow-backend.json"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-    def init_default(self, preset: str = "local") -> RolePolicySet:
+    def init_default(self, preset: str = "local", workflow_backend: str = "local") -> RolePolicySet:
         policy = self._policy_for_preset(preset)
         self.write_policy(policy)
+        self.write_workflow_backend(workflow_backend)
         return policy
 
     def load_policy(self) -> RolePolicySet:
@@ -24,9 +26,27 @@ class ConfigStore:
             return self.init_default()
         return RolePolicySet.from_dict(json.loads(self.config_path.read_text()))
 
+    def load_workflow_backend(self) -> str:
+        if not self.workflow_path.exists():
+            return "local"
+        payload = json.loads(self.workflow_path.read_text())
+        backend = payload.get("workflow_backend", "local")
+        return self._validated_workflow_backend(backend)
+
     def write_policy(self, policy: RolePolicySet) -> None:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path.write_text(json.dumps(policy.to_dict(), indent=2, sort_keys=True) + "\n")
+
+    def write_workflow_backend(self, workflow_backend: str) -> None:
+        backend = self._validated_workflow_backend(workflow_backend)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.workflow_path.write_text(json.dumps({"workflow_backend": backend}, indent=2, sort_keys=True) + "\n")
+
+    def _validated_workflow_backend(self, workflow_backend: str) -> str:
+        backend = str(workflow_backend).strip().lower()
+        if backend not in {"local", "langgraph"}:
+            raise ValueError(f"Unsupported workflow backend: {workflow_backend}")
+        return backend
 
     def _policy_for_preset(self, preset: str) -> RolePolicySet:
         if preset == "local":

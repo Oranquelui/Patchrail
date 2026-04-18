@@ -4,6 +4,7 @@ import importlib
 import os
 
 from patchrail.core.exceptions import PatchrailError
+from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
 from patchrail.workflows.base import PlanWorkflowResult, ReviewWorkflowResult, WorkflowEngine
 from patchrail.workflows.local import LocalWorkflowEngine
@@ -17,8 +18,7 @@ __all__ = [
 
 
 def build_workflow_engine(store: FilesystemStore) -> WorkflowEngine:
-    del store
-    backend_name = os.getenv("PATCHRAIL_WORKFLOW_BACKEND", "local").strip().lower()
+    backend_name = _configured_backend_name(store)
     if not backend_name or backend_name == "local":
         return LocalWorkflowEngine()
     if backend_name == "langgraph":
@@ -33,3 +33,10 @@ def build_workflow_engine(store: FilesystemStore) -> WorkflowEngine:
     raise PatchrailError(
         f"Unknown workflow backend '{backend_name}'. Use 'local' or 'langgraph'."
     )
+
+
+def _configured_backend_name(store: FilesystemStore) -> str:
+    override = os.getenv("PATCHRAIL_WORKFLOW_BACKEND")
+    if override is not None and override.strip():
+        return override.strip().lower()
+    return ConfigStore(store.root).load_workflow_backend()

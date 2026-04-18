@@ -11,6 +11,9 @@ requires-python = ">=3.12"
 authors = [{ name = "Patchrail" }]
 dependencies = []
 
+[project.optional-dependencies]
+langgraph = ["langgraph"]
+
 [project.scripts]
 patchrail = "patchrail.cli.main:run"
 

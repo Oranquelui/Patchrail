@@ -606,6 +606,99 @@ def test_plan_auto_surfaces_workflow_backend_initialization_errors(
     assert "optional" in captured.err.lower()
 
 
+def test_config_init_can_persist_langgraph_workflow_backend_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-workflow-config"))
+
+    class FakeLangGraphWorkflowEngine:
+        backend_name = "langgraph"
+
+        def generate_plan(self, candidate, task):  # noqa: ANN001
+            return type(
+                "PlanWorkflowResult",
+                (),
+                {
+                    "summary": "LangGraph-configured plan",
+                    "steps": ["Run planner graph"],
+                    "metadata": {"graph": "planner"},
+                },
+            )()
+
+        def generate_review(self, candidate, task, plan, run, bundle):  # noqa: ANN001
+            raise AssertionError("review workflow should not be used in this test")
+
+    fake_module = type("FakeModule", (), {"LangGraphWorkflowEngine": FakeLangGraphWorkflowEngine})
+    monkeypatch.setattr("patchrail.workflows.importlib.import_module", lambda name: fake_module, raising=False)
+
+    exit_code, config_payload = run_cli(["config", "init", "--workflow-backend", "langgraph"], capsys)
+    assert exit_code == 0
+    assert config_payload["workflow"]["backend"] == "langgraph"
+    assert Path(config_payload["workflow"]["path"]).exists()
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Configurable workflow backend", "--description", "Persist langgraph backend"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(["plan", "--task-id", task_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert planned["plan"]["summary"] == "LangGraph-configured plan"
+    assert planned["plan"]["workflow_backend"] == "langgraph"
+    assert planned["plan"]["workflow_metadata"]["graph"] == "planner"
+
+
+def test_env_workflow_backend_overrides_persisted_config_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-workflow-config-override"))
+
+    class FakeLangGraphWorkflowEngine:
+        backend_name = "langgraph"
+
+        def generate_plan(self, candidate, task):  # noqa: ANN001
+            return type(
+                "PlanWorkflowResult",
+                (),
+                {
+                    "summary": "Env-selected LangGraph plan",
+                    "steps": ["Use env override"],
+                    "metadata": {"selected_by": "env"},
+                },
+            )()
+
+        def generate_review(self, candidate, task, plan, run, bundle):  # noqa: ANN001
+            raise AssertionError("review workflow should not be used in this test")
+
+    fake_module = type("FakeModule", (), {"LangGraphWorkflowEngine": FakeLangGraphWorkflowEngine})
+    monkeypatch.setattr("patchrail.workflows.importlib.import_module", lambda name: fake_module, raising=False)
+
+    exit_code, config_payload = run_cli(["config", "init", "--workflow-backend", "local"], capsys)
+    assert exit_code == 0
+    assert config_payload["workflow"]["backend"] == "local"
+
+    monkeypatch.setenv("PATCHRAIL_WORKFLOW_BACKEND", "langgraph")
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Env override", "--description", "Env should beat persisted config"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(["plan", "--task-id", task_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert planned["plan"]["summary"] == "Env-selected LangGraph plan"
+    assert planned["plan"]["workflow_backend"] == "langgraph"
+    assert planned["plan"]["workflow_metadata"]["selected_by"] == "env"
+
+
 def test_list_commands_return_tasks_runs_and_approvals(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

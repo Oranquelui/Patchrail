@@ -6,6 +6,7 @@ Prove Patchrail’s thesis with the narrowest possible supervised workflow: a ta
 ## In Scope
 - CLI commands for config bootstrap, preflight inspection, task creation, planning, execution, status, review, approval, rejection, logs, and artifact lookup.
 - Filesystem persistence under `.patchrail/` or `PATCHRAIL_HOME`.
+- CLI-visible workflow backend selection persisted under local config, with `local` as default and `langgraph` as an optional backend.
 - Role ontology for `planner`, `reviewer`, and `executor` across `codex`, `claude`, and `grok` with `api` and `subscription` access modes.
 - Supervised `plan --auto` and `review --auto` paths behind a pluggable workflow backend seam, with canonical records still owned by Patchrail.
 - Deterministic local harness execution through shell-backed commands, with policy-resolved candidates supplying the concrete command.
@@ -17,7 +18,7 @@ Prove Patchrail’s thesis with the narrowest possible supervised workflow: a ta
 - Minimal tests covering happy path, invalid transitions, role-policy resolution, and resumption from disk.
 
 ## Acceptance Criteria
-- `patchrail config init` creates a local role-policy document.
+- `patchrail config init` creates a local role-policy document and persists the selected workflow backend.
 - `patchrail preflight` reports role candidate readiness from local state and environment only.
 - `patchrail task create` creates a task and persists it locally.
 - `patchrail plan` resolves and persists a planner assignment, stores a plan, and moves the task to `planned`.
@@ -37,6 +38,7 @@ Prove Patchrail’s thesis with the narrowest possible supervised workflow: a ta
 - Web dashboards or GUI review surfaces.
 - Fully autonomous planning/execution, autonomous approvals, or merge automation.
 - LangGraph-driven executor orchestration or backend-owned approval state.
+- LangGraph Studio or any dashboard-first operator workflow.
 - Full localization of every CLI message beyond the current structured-output discipline.
 - Infrastructure automation beyond a placeholder hook contract.
 
