@@ -115,6 +115,8 @@ class Plan:
     resolved_assignment: ResolvedAssignment | None = None
     preflight_results: list[PreflightResult] = field(default_factory=list)
     fallback_event: FallbackEvent | None = None
+    workflow_backend: str | None = None
+    workflow_metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> Plan:
@@ -130,6 +132,8 @@ class Plan:
             else None,
             preflight_results=[PreflightResult.from_dict(item) for item in payload.get("preflight_results", [])],
             fallback_event=FallbackEvent.from_dict(payload["fallback_event"]) if payload.get("fallback_event") else None,
+            workflow_backend=payload.get("workflow_backend"),
+            workflow_metadata=dict(payload.get("workflow_metadata", {})),
         )
 
 
@@ -203,6 +207,8 @@ class ReviewResult:
     resolved_assignment: ResolvedAssignment | None = None
     preflight_results: list[PreflightResult] = field(default_factory=list)
     fallback_event: FallbackEvent | None = None
+    workflow_backend: str | None = None
+    workflow_metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> ReviewResult:
@@ -219,6 +225,8 @@ class ReviewResult:
             else None,
             preflight_results=[PreflightResult.from_dict(item) for item in payload.get("preflight_results", [])],
             fallback_event=FallbackEvent.from_dict(payload["fallback_event"]) if payload.get("fallback_event") else None,
+            workflow_backend=payload.get("workflow_backend"),
+            workflow_metadata=dict(payload.get("workflow_metadata", {})),
         )
 
 

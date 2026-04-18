@@ -21,6 +21,8 @@ class ReviewService:
         resolved_assignment: ResolvedAssignment | None = None,
         preflight_results: list[PreflightResult] | None = None,
         fallback_event: FallbackEvent | None = None,
+        workflow_backend: str | None = None,
+        workflow_metadata: dict[str, object] | None = None,
     ) -> ReviewResult:
         require_state(task, TaskState.REVIEW_PENDING, "review a run")
         if task.latest_review_id is not None:
@@ -37,6 +39,8 @@ class ReviewService:
             resolved_assignment=resolved_assignment,
             preflight_results=preflight_results or [],
             fallback_event=fallback_event,
+            workflow_backend=workflow_backend,
+            workflow_metadata=dict(workflow_metadata or {}),
         )
         self.store.save_review(review)
 

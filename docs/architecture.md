@@ -6,10 +6,11 @@ Patchrail is a local-first control plane that records supervised coding-agent wo
 ## Core Modules
 - `patchrail.cli`: `argparse`-based command surface for task, config, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands, including explicit `access_mode` filters and auto/manual plan-review paths.
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
+- `patchrail.workflows`: pluggable auto plan/review backend contract plus the default local backend and an optional LangGraph-backed planner/reviewer scaffold.
 - `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
 - `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, and artifact lookup.
 - `patchrail.runners`: runner interface, shell-backed local harness execution, API-backed executor runners, and Claude-backed subscription executor runners.
-- `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls plus planner/reviewer auto-generation.
+- `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls and workflow backends that need direct provider completion calls.
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
 - `patchrail.approval`: explicit task approval and fallback approval request handling plus ledger appends.
 - `patchrail.artifacts`: artifact bundle creation and lookup.
@@ -41,9 +42,9 @@ Hard rules:
 
 ## State Model
 - `Task` is the supervisory anchor for a unit of work.
-- `Plan` belongs to a task, must exist before a run can start, and stores the resolved planner assignment plus preflight evidence.
+- `Plan` belongs to a task, must exist before a run can start, and stores the resolved planner assignment plus preflight evidence. Auto-generated plans may also store auxiliary workflow backend metadata, but the canonical plan record remains Patchrail-owned.
 - `Run` records runner assignment, elapsed time, synthetic output, artifact bundle identity, and the resolved executor assignment plus preflight evidence.
-- `ReviewResult` records the reviewer verdict, rationale, and the resolved reviewer assignment plus preflight evidence.
+- `ReviewResult` records the reviewer verdict, rationale, and the resolved reviewer assignment plus preflight evidence. Auto-generated reviews may also store auxiliary workflow backend metadata, but approval meaning remains outside the backend.
 - `ApprovalRecord` records the human decision and rationale after review.
 - `FallbackApprovalRequest` records a human-reviewed exception request when role resolution needs a blocked fallback.
 - `PreflightSnapshot` records a standalone phase-resolution snapshot so operator audits can inspect preflight attempts independently from plan/run/review records.
@@ -116,10 +117,13 @@ Current adapter behavior:
 `codex subscription` execution remains deferred until the non-interactive runtime path is stable enough to trust in the core runtime.
 
 Planner / reviewer automation:
-- `plan --auto` resolves the planner candidate and generates structured `summary + steps`.
-- `review --auto` resolves the reviewer candidate and generates structured `verdict + summary`.
-- Local preset uses deterministic simulated generation for both.
-- Live automation currently supports:
+- `plan --auto` and `review --auto` resolve their candidates in the core service, then delegate content generation through the `WorkflowEngine` contract.
+- The default backend is `patchrail.workflows.local.LocalWorkflowEngine`, which preserves the current deterministic local simulation and direct provider-completion behavior.
+- `patchrail.workflows.langgraph_backend.LangGraphWorkflowEngine` is optional and subordinate. It may hold backend workflow state, but it does not own the canonical task lifecycle, approval boundary, artifact bundle, approval ledger, or decision trace.
+- Workflow backend selection is explicit through `PATCHRAIL_WORKFLOW_BACKEND`, which currently supports `local` and `langgraph`.
+- Missing optional LangGraph dependencies fail only when an auto plan/review path tries to initialize that backend.
+- Local preset uses deterministic simulated generation for both planner and reviewer workflows.
+- Live workflow generation currently supports:
   - planner: `claude subscription`, `codex api`
   - reviewer: `claude api`
 - Unsupported live candidates fail loudly instead of silently downgrading to manual or stub behavior.
@@ -164,12 +168,12 @@ Read-side navigation:
 ## Artifact And Approval Flow
 1. `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
 2. `task create` stores a new task and appends a decision trace.
-3. `plan` resolves the planner candidate, optionally auto-generates plan content, stores the plan with preflight evidence, updates the task to `planned`, and appends decision traces.
+3. `plan` resolves the planner candidate, optionally auto-generates plan content through the selected workflow backend, stores the plan with preflight evidence plus any auxiliary workflow metadata, updates the task to `planned`, and appends decision traces.
 4. Every `plan`, `run`, and `review` resolution attempt first writes a standalone `PreflightSnapshot`.
 5. If role resolution hits a blocked fallback, Patchrail stores a `FallbackApprovalRequest`, appends trace and fallback-approval ledger entries, and stops the phase without mutating the task lifecycle.
 6. `approve-fallback` or `reject-fallback` records the human decision for that deviation request.
 7. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
-8. `review` resolves the reviewer candidate, optionally auto-generates review content, stores the review result with rationale and preflight evidence, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
+8. `review` resolves the reviewer candidate, optionally auto-generates review content through the selected workflow backend, stores the review result with rationale and preflight evidence plus any auxiliary workflow metadata, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
 9. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
 
 ## Deferred Hook Contract

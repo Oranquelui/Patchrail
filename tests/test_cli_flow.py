@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 from patchrail.cli.main import main
+from patchrail.core.exceptions import PatchrailError
 from patchrail.models.entities import CostMetrics
+from patchrail.models.entities import ReviewVerdict
 from patchrail.runners.base import RunnerResult
 
 
@@ -468,11 +470,24 @@ def test_plan_auto_can_use_subscription_planner_path(
 
     monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
 
-    monkeypatch.setattr(
-        "patchrail.core.service.generate_plan_content",
-        lambda candidate, task: ("Auto subscription plan", ["Inspect task", "Prepare bounded execution"]),
-        raising=False,
-    )
+    class FakeWorkflowEngine:
+        backend_name = "fake-workflow"
+
+        def generate_plan(self, candidate, task):  # noqa: ANN001
+            return type(
+                "PlanWorkflowResult",
+                (),
+                {
+                    "summary": "Auto subscription plan",
+                    "steps": ["Inspect task", "Prepare bounded execution"],
+                    "metadata": {"backend": self.backend_name},
+                },
+            )()
+
+        def generate_review(self, candidate, task, plan, run, bundle):  # noqa: ANN001
+            raise AssertionError("review workflow should not be used in this test")
+
+    monkeypatch.setattr("patchrail.core.service.build_workflow_engine", lambda store: FakeWorkflowEngine(), raising=False)
 
     exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
     assert exit_code == 0
@@ -489,6 +504,106 @@ def test_plan_auto_can_use_subscription_planner_path(
     assert planned["plan"]["summary"] == "Auto subscription plan"
     assert planned["plan"]["resolved_assignment"]["provider"] == "claude"
     assert planned["plan"]["resolved_assignment"]["access_mode"] == "subscription"
+
+
+def test_auto_plan_and_review_use_workflow_engine_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-workflows"))
+
+    class FakeWorkflowEngine:
+        backend_name = "fake-workflow"
+
+        def generate_plan(self, candidate, task):  # noqa: ANN001
+            return type(
+                "PlanWorkflowResult",
+                (),
+                {
+                    "summary": "Workflow-generated plan",
+                    "steps": ["Ask the workflow engine"],
+                    "metadata": {"backend": self.backend_name, "task_id": task.id},
+                },
+            )()
+
+        def generate_review(self, candidate, task, plan, run, bundle):  # noqa: ANN001
+            return type(
+                "ReviewWorkflowResult",
+                (),
+                {
+                    "verdict": ReviewVerdict.FAIL,
+                    "summary": "Workflow-generated review",
+                    "metadata": {"backend": self.backend_name, "run_id": run.id},
+                },
+            )()
+
+    monkeypatch.setattr(
+        "patchrail.core.service.build_workflow_engine",
+        lambda store: FakeWorkflowEngine(),
+        raising=False,
+    )
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Workflow seam", "--description", "Auto plan/review should use workflow engine"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(["plan", "--task-id", task_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert planned["plan"]["summary"] == "Workflow-generated plan"
+    assert planned["plan"]["steps"] == ["Ask the workflow engine"]
+    assert planned["plan"]["workflow_backend"] == "fake-workflow"
+    assert planned["plan"]["workflow_metadata"]["task_id"] == task_id
+
+    exit_code, executed = run_cli(["run", "--task-id", task_id, "--runner", "claude_code"], capsys)
+    assert exit_code == 0
+    run_id = executed["run"]["id"]
+
+    exit_code, reviewed = run_cli(["review", "--run-id", run_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert reviewed["review"]["verdict"] == "fail"
+    assert reviewed["review"]["summary"] == "Workflow-generated review"
+    assert reviewed["review"]["workflow_backend"] == "fake-workflow"
+    assert reviewed["review"]["workflow_metadata"]["run_id"] == run_id
+
+
+def test_plan_auto_surfaces_workflow_backend_initialization_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-langgraph"))
+    monkeypatch.setenv("PATCHRAIL_WORKFLOW_BACKEND", "langgraph")
+
+    monkeypatch.setattr(
+        "patchrail.core.service.build_workflow_engine",
+        lambda store: (_ for _ in ()).throw(
+            PatchrailError("LangGraph workflow backend requires the optional 'langgraph' dependency.")
+        ),
+        raising=False,
+    )
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "LangGraph optional", "--description", "Surface missing dependency clearly"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code = main(["plan", "--task-id", task_id, "--auto"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "langgraph" in captured.err.lower()
+    assert "optional" in captured.err.lower()
 
 
 def test_list_commands_return_tasks_runs_and_approvals(

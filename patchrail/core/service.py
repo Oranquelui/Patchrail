@@ -29,13 +29,13 @@ from patchrail.models.entities import (
     serialize,
 )
 from patchrail.models.roles import AccessMode, Provider, Role
-from patchrail.providers.role_generation import generate_plan_content, generate_review_content
 from patchrail.review.service import ReviewService
 from patchrail.runners.api import build_api_runner
 from patchrail.runners.subscription import build_subscription_runner
 from patchrail.runners.stub import build_runner
 from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
+from patchrail.workflows import WorkflowEngine, build_workflow_engine
 
 
 class PatchrailApp:
@@ -47,6 +47,7 @@ class PatchrailApp:
         self.review = ReviewService(store)
         self.approval = ApprovalService(store)
         self.fallback_approval = FallbackApprovalService(store)
+        self._workflow_engine_instance: WorkflowEngine | None = None
 
     @classmethod
     def from_environment(cls, cwd: Path | None = None) -> PatchrailApp:
@@ -109,15 +110,21 @@ class PatchrailApp:
         )
         self._record_preflight_snapshot(task.id, phase=PreflightPhase.PLAN, role=Role.PLANNER, resolution=resolution)
         assignment = self._require_assignment(task, role=Role.PLANNER, resolution=resolution)
+        workflow_result = None
         if auto:
             if resolution.selected_candidate is None:
                 raise PatchrailError("No planner candidate was selected.")
-            summary, steps = generate_plan_content(resolution.selected_candidate, task)
+            workflow_result = self._get_workflow_engine().generate_plan(resolution.selected_candidate, task)
+            summary, steps = workflow_result.summary, workflow_result.steps
             self._append_trace(
                 task.id,
                 "plan.generated",
-                f"Generated plan content via {assignment.candidate_name}.",
-                metadata={"assignment": serialize(assignment)},
+                f"Generated plan content via {assignment.candidate_name} using {self._get_workflow_engine().backend_name}.",
+                metadata={
+                    "assignment": serialize(assignment),
+                    "workflow_backend": self._get_workflow_engine().backend_name,
+                    "workflow_metadata": serialize(workflow_result.metadata),
+                },
             )
         if summary is None or steps is None:
             raise PatchrailError("Plan requires summary and at least one step.")
@@ -132,6 +139,8 @@ class PatchrailApp:
             resolved_assignment=assignment,
             preflight_results=resolution.results,
             fallback_event=resolution.fallback_event,
+            workflow_backend=self._get_workflow_engine().backend_name if workflow_result else None,
+            workflow_metadata=workflow_result.metadata if workflow_result else {},
         )
         self.store.save_plan(plan)
         task.plan_id = plan.id
@@ -282,6 +291,7 @@ class PatchrailApp:
         )
         self._record_preflight_snapshot(task.id, phase=PreflightPhase.REVIEW, role=Role.REVIEWER, resolution=resolution)
         assignment = self._require_assignment(task, role=Role.REVIEWER, resolution=resolution)
+        workflow_result = None
         if auto:
             if task.plan_id is None:
                 raise PatchrailError(f"Task {task.id} has no plan for automated review.")
@@ -289,18 +299,25 @@ class PatchrailApp:
                 raise PatchrailError("No reviewer candidate was selected.")
             plan = self.store.load_plan(task.plan_id)
             bundle = self.store.load_artifact_bundle(run.id)
-            verdict_value, summary_value = generate_review_content(
+            workflow_result = self._get_workflow_engine().generate_review(
                 resolution.selected_candidate,
                 task,
                 plan,
                 run,
                 bundle,
             )
+            verdict_value = workflow_result.verdict
+            summary_value = workflow_result.summary
             self._append_trace(
                 task.id,
                 "review.generated",
-                f"Generated review content via {assignment.candidate_name}.",
-                metadata={"assignment": serialize(assignment), "verdict": verdict_value.value},
+                f"Generated review content via {assignment.candidate_name} using {self._get_workflow_engine().backend_name}.",
+                metadata={
+                    "assignment": serialize(assignment),
+                    "verdict": verdict_value.value,
+                    "workflow_backend": self._get_workflow_engine().backend_name,
+                    "workflow_metadata": serialize(workflow_result.metadata),
+                },
             )
         else:
             if verdict is None or summary is None:
@@ -316,6 +333,8 @@ class PatchrailApp:
             resolved_assignment=assignment,
             preflight_results=resolution.results,
             fallback_event=resolution.fallback_event,
+            workflow_backend=self._get_workflow_engine().backend_name if workflow_result else None,
+            workflow_metadata=workflow_result.metadata if workflow_result else {},
         )
         self._append_trace(
             task.id,
@@ -485,6 +504,11 @@ class PatchrailApp:
         if access_mode_name in (None, "auto"):
             return None
         return AccessMode(access_mode_name)
+
+    def _get_workflow_engine(self) -> WorkflowEngine:
+        if self._workflow_engine_instance is None:
+            self._workflow_engine_instance = build_workflow_engine(self.store)
+        return self._workflow_engine_instance
 
     def _validate_plan_inputs(self, auto: bool, summary: str | None, steps: list[str] | None) -> None:
         if auto and (summary is not None or steps):
