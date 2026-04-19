@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+JAPANESE_TEXT_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
 
 
 def test_repo_includes_mit_license_file() -> None:
@@ -28,3 +30,19 @@ def test_readme_mentions_mit_license() -> None:
 
     assert "## License" in readme
     assert "MIT" in readme
+
+
+def test_english_readme_exists_without_japanese_text() -> None:
+    readme = (REPO_ROOT / "README.md").read_text()
+
+    assert not JAPANESE_TEXT_RE.search(readme)
+    assert "README.ja.md" in readme
+
+
+def test_japanese_readme_exists_and_links_back_to_english_readme() -> None:
+    readme_ja = REPO_ROOT / "README.ja.md"
+
+    assert readme_ja.exists()
+    content = readme_ja.read_text()
+    assert "README.md" in content
+    assert JAPANESE_TEXT_RE.search(content)
