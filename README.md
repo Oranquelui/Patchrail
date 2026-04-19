@@ -9,7 +9,7 @@ brew install pipx
 pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
-patchrail doctor
+patchrail start
 
 # optional workflow backend
 sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
@@ -24,8 +24,7 @@ CLI は default で人間向けの要約表示を返します。script や autom
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 # deterministic local flow
-patchrail doctor
-patchrail config init
+patchrail start
 patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
 patchrail --json status --task-id <task_id>

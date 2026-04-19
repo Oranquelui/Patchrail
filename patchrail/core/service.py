@@ -75,6 +75,28 @@ class PatchrailApp:
             "workflow": {"path": str(self.config.workflow_path), "backend": self.config.load_workflow_backend()},
         }
 
+    def start(self, preset: str = "local", workflow_backend: str = "local") -> dict[str, Any]:
+        config_initialized = self.config.config_path.exists() and self.config.workflow_path.exists()
+        if not config_initialized:
+            self.init_config(preset=preset, workflow_backend=workflow_backend)
+        doctor = self.doctor()["doctor"]
+        return {
+            "start": {
+                "patchrail_home": str(self.store.root),
+                "config_created": not config_initialized,
+                "config_initialized": True,
+                "config_path": str(self.config.config_path),
+                "workflow_path": str(self.config.workflow_path),
+                "workflow_backend": doctor["workflow_backend"],
+                "preflight": doctor["preflight"],
+                "next_steps": [
+                    'patchrail task create --title "First task" --description "Describe the work"',
+                    "sh scripts/local_smoke_test.sh",
+                    "patchrail doctor",
+                ],
+            }
+        }
+
     def doctor(self) -> dict[str, Any]:
         config_initialized = self.config.config_path.exists() and self.config.workflow_path.exists()
         workflow_backend = self.config.load_workflow_backend() if self.config.workflow_path.exists() else None

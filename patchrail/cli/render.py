@@ -4,6 +4,8 @@ from typing import Any
 
 
 def render_payload(args: Any, payload: dict[str, Any]) -> str:
+    if args.command == "start":
+        return _render_start(payload)
     if args.command == "config" and getattr(args, "config_command", None) == "init":
         return _render_config_init(payload)
     if args.command == "doctor":
@@ -48,6 +50,32 @@ def _render_config_init(payload: dict[str, Any]) -> str:
             "  sh scripts/local_smoke_test.sh",
         ]
     )
+
+
+def _render_start(payload: dict[str, Any]) -> str:
+    start = payload["start"]
+    lines = [
+        "Patchrail Start",
+        f"Home: {start['patchrail_home']}",
+        f"Config: {'created' if start['config_created'] else 'existing'}",
+        f"Workflow backend: {start['workflow_backend']}",
+    ]
+    preflight = start.get("preflight") or {}
+    if preflight:
+        lines.append("Resolved candidates:")
+        for role in ("planner", "reviewer", "executor"):
+            item = preflight.get(role)
+            if not item or item.get("selected_candidate") is None:
+                continue
+            selected = item["selected_candidate"]
+            lines.append(
+                f"  {role.capitalize()}: {selected['candidate_name']} "
+                f"({selected['provider']} {selected['access_mode']})"
+            )
+    lines.append("Next:")
+    for step in start["next_steps"]:
+        lines.append(f"  {step}")
+    return "\n".join(lines)
 
 
 def _render_doctor(payload: dict[str, Any]) -> str:

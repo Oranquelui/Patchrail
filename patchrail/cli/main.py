@@ -27,6 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
     config_init.add_argument("--preset", choices=["local", "real"], default="local")
     config_init.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
 
+    start_parser = subparsers.add_parser("start")
+    start_parser.add_argument("--preset", choices=["local", "real"], default="local")
+    start_parser.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
+
     subparsers.add_parser("doctor")
 
     plan_parser = subparsers.add_parser("plan")
@@ -110,6 +114,8 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
         return app.create_task(title=args.title, description=args.description)
     if args.command == "config" and args.config_command == "init":
         return app.init_config(preset=args.preset, workflow_backend=args.workflow_backend)
+    if args.command == "start":
+        return app.start(preset=args.preset, workflow_backend=args.workflow_backend)
     if args.command == "doctor":
         return app.doctor()
     if args.command == "plan":

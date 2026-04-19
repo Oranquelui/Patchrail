@@ -55,6 +55,64 @@ def test_config_init_defaults_to_human_readable_output(
     assert not stdout.lstrip().startswith("{")
 
 
+def test_start_bootstraps_default_config_in_json_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, payload = run_cli(["start"], capsys)
+
+    assert exit_code == 0
+    start = payload["start"]
+    assert start["config_created"] is True
+    assert start["workflow_backend"] == "local"
+    assert start["config_initialized"] is True
+    assert start["preflight"]["planner"]["selected_candidate"]["candidate_name"] == "claude_subscription_planner"
+    assert start["next_steps"] == [
+        'patchrail task create --title "First task" --description "Describe the work"',
+        "sh scripts/local_smoke_test.sh",
+        "patchrail doctor",
+    ]
+
+
+def test_start_preserves_existing_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real", "--workflow-backend", "langgraph"], capsys)
+    assert exit_code == 0
+
+    exit_code, payload = run_cli(["start"], capsys)
+
+    assert exit_code == 0
+    start = payload["start"]
+    assert start["config_created"] is False
+    assert start["workflow_backend"] == "langgraph"
+
+
+def test_start_defaults_to_human_readable_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, stdout, stderr = run_cli_text(["start"], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout.startswith("Patchrail Start")
+    assert "Config: created" in stdout
+    assert "Workflow backend: local" in stdout
+    assert 'patchrail task create --title "First task" --description "Describe the work"' in stdout
+    assert "sh scripts/local_smoke_test.sh" in stdout
+
+
 def test_json_flag_preserves_structured_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
