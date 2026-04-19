@@ -2,28 +2,38 @@
 
 Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現段階では CLI と headless core に絞り、`task -> plan -> run -> review -> approval` の状態遷移、artifact bundle、decision trace、approval ledger をローカルに残します。現在は `planner / reviewer / executor` に対して `provider × access_mode(api|subscription)` の候補集合を持ち、各フェーズ開始時に preflight と policy 解決を行って concrete assignment を固定保存します。
 
+## Install CLI
+```bash
+cd /path/to/Patchrail
+brew install pipx
+pipx ensurepath
+sh scripts/install_cli.sh --python "$(command -v python3.13)"
+patchrail --help
+
+# optional workflow backend
+sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
+```
+
+`patchrail` command 自体は package entrypoint として定義済みで、`scripts/install_cli.sh` はそれを `pipx` 経由で PATH に載せるだけです。`python3` が 3.12 未満の環境では、`--python "$(command -v python3.13)"` のように明示指定します。
+
 ## Quickstart
 ```bash
 cd /path/to/Patchrail
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
-# optional workflow backend
-pip install -e '.[langgraph]'
+sh scripts/install_cli.sh --python "$(command -v python3.13)"
 # deterministic local flow
-python3 -m patchrail.cli config init
-python3 -m patchrail.cli config init --workflow-backend langgraph
-python3 -m patchrail.cli preflight --role planner
+patchrail config init
+patchrail config init --workflow-backend langgraph
+patchrail preflight --role planner
 # live readiness checks
-python3 -m patchrail.cli config init --preset real --workflow-backend local
-python3 -m patchrail.cli preflight --role executor --runner auto
+patchrail config init --preset real --workflow-backend local
+patchrail preflight --role executor --runner auto
 pytest -q
 sh scripts/local_smoke_test.sh
 PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
 PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
-python3 -m patchrail.cli list tasks
-python3 -m patchrail.cli list preflight-snapshots
-python3 -m patchrail.cli list artifact-bundles --has-trace
+patchrail list tasks
+patchrail list preflight-snapshots
+patchrail list artifact-bundles --has-trace
 ```
 
 `config init` は `.patchrail/config/role-policy.json` と `.patchrail/config/workflow-backend.json` を作成します。デフォルトの `local` preset は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。`config init --preset real` は live-readiness 用の role policy を書き出し、subscription 候補の preflight を実 CLI で確認します。workflow backend は CLI-first に `config init --workflow-backend local|langgraph` で保存し、`PATCHRAIL_WORKFLOW_BACKEND` は一時 override としてだけ使います。
@@ -48,39 +58,39 @@ python3 -m patchrail.cli list artifact-bundles --has-trace
 executor の API path を試す場合は `--access-mode api` を使います。たとえば Grok API executor は次で選べます。
 
 ```bash
-python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
-python3 -m patchrail.cli run --task-id <task_id> --runner grok_runner --access-mode api
+patchrail preflight --role executor --runner grok_runner --access-mode api
+patchrail run --task-id <task_id> --runner grok_runner --access-mode api
 ```
 
 Claude subscription execution も live runner で試せます。
 
 ```bash
-python3 -m patchrail.cli preflight --role executor --runner claude_code --access-mode subscription
-python3 -m patchrail.cli run --task-id <task_id> --runner claude_code --access-mode subscription
+patchrail preflight --role executor --runner claude_code --access-mode subscription
+patchrail run --task-id <task_id> --runner claude_code --access-mode subscription
 ```
 
 Codex subscription execution も live runner で試せます。
 
 ```bash
-python3 -m patchrail.cli preflight --role executor --runner codex_runner --access-mode subscription
-python3 -m patchrail.cli run --task-id <task_id> --runner codex_runner --access-mode subscription
+patchrail preflight --role executor --runner codex_runner --access-mode subscription
+patchrail run --task-id <task_id> --runner codex_runner --access-mode subscription
 ```
 
 planner / reviewer も auto path を持ちます。manual 入力を残したまま、`--auto` で role candidate に生成を任せられます。
 
 ```bash
-python3 -m patchrail.cli config init --workflow-backend local
-python3 -m patchrail.cli plan --task-id <task_id> --auto
-python3 -m patchrail.cli review --run-id <run_id> --auto
-python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
+patchrail config init --workflow-backend local
+patchrail plan --task-id <task_id> --auto
+patchrail review --run-id <run_id> --auto
+patchrail review --run-id <run_id> --auto --access-mode api
 ```
 
 LangGraph を使う場合は optional dependency を入れた上で backend を切り替えます。Patchrail に入るのは LangGraph runtime であり、LangGraph Studio は必須ではありません。Studio は graph 可視化・実行・デバッグ用の UI で、Patchrail の canonical control plane には入りません。
 
 ```bash
-pip install -e '.[langgraph]'
-python3 -m patchrail.cli config init --workflow-backend langgraph
-python3 -m patchrail.cli plan --task-id <task_id> --auto
+sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
+patchrail config init --workflow-backend langgraph
+patchrail plan --task-id <task_id> --auto
 ```
 
 現在の LangGraph backend は planner / reviewer に対して stateless な 4-node graph を使います。

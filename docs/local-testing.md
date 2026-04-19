@@ -3,30 +3,41 @@
 ## Goal
 Patchrail を手元で end-to-end に試し、task 生成から approval までの最小フローとローカル永続化を確認する。
 
-## Fastest Path
-1. 仮想環境を作る。
+## Install CLI
 ```bash
 cd /path/to/Patchrail
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
-pip install -e '.[langgraph]'
+brew install pipx
+pipx ensurepath
+sh scripts/install_cli.sh --python "$(command -v python3.13)"
+patchrail --help
+```
+
+optional LangGraph runtime まで同じ install 導線で入れる場合:
+```bash
+sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
+```
+
+## Fastest Path
+1. CLI を install する。
+```bash
+cd /path/to/Patchrail
+sh scripts/install_cli.sh --python "$(command -v python3.13)"
 ```
 2. role policy を初期化し、preflight を確認する。
 ```bash
 # local preset
-python3 -m patchrail.cli config init
-python3 -m patchrail.cli config init --workflow-backend langgraph
-python3 -m patchrail.cli preflight --role planner
-python3 -m patchrail.cli preflight --role reviewer
-python3 -m patchrail.cli preflight --role executor --runner auto
+patchrail config init
+patchrail config init --workflow-backend langgraph
+patchrail preflight --role planner
+patchrail preflight --role reviewer
+patchrail preflight --role executor --runner auto
 
 # real preset
-python3 -m patchrail.cli config init --preset real --workflow-backend local
-python3 -m patchrail.cli preflight --role executor --runner auto
+patchrail config init --preset real --workflow-backend local
+patchrail preflight --role executor --runner auto
 
 # api executor path
-python3 -m patchrail.cli preflight --role executor --runner grok_runner --access-mode api
+patchrail preflight --role executor --runner grok_runner --access-mode api
 ```
 3. テストを実行する。
 ```bash
@@ -41,14 +52,14 @@ PATCHRAIL_WORKFLOW_BACKEND=langgraph PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW
 ```
 5. 保存済みレコードを一覧する。
 ```bash
-python3 -m patchrail.cli list tasks
-python3 -m patchrail.cli list plans
-python3 -m patchrail.cli list runs
-python3 -m patchrail.cli list reviews
-python3 -m patchrail.cli list approvals
-python3 -m patchrail.cli list fallback-requests
-python3 -m patchrail.cli list preflight-snapshots
-python3 -m patchrail.cli list artifact-bundles --has-trace
+patchrail list tasks
+patchrail list plans
+patchrail list runs
+patchrail list reviews
+patchrail list approvals
+patchrail list fallback-requests
+patchrail list preflight-snapshots
+patchrail list artifact-bundles --has-trace
 ```
 
 `scripts/local_smoke_test.sh` は以下を自動で行う:
