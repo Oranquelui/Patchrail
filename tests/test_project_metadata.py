@@ -46,6 +46,30 @@ def test_readme_screenshot_asset_exists() -> None:
     assert screenshot.exists()
 
 
+def test_public_repo_excludes_internal_planning_directories() -> None:
+    assert not (REPO_ROOT / ".taskmaster").exists()
+    assert not (REPO_ROOT / "docs" / "superpowers").exists()
+
+
+def test_gitignore_ignores_internal_planning_directories() -> None:
+    gitignore = (REPO_ROOT / ".gitignore").read_text()
+
+    assert ".taskmaster/" in gitignore
+    assert "docs/superpowers/" in gitignore
+
+
+def test_public_markdown_docs_do_not_include_local_absolute_paths() -> None:
+    markdown_files = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "README.ja.md",
+        *sorted((REPO_ROOT / "docs").glob("*.md")),
+    ]
+
+    for markdown_file in markdown_files:
+        content = markdown_file.read_text()
+        assert "/Users/" not in content, markdown_file
+
+
 def test_japanese_readme_exists_and_links_back_to_english_readme() -> None:
     readme_ja = REPO_ROOT / "README.ja.md"
 

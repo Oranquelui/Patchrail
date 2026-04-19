@@ -1,8 +1,10 @@
 __pycache__/
 .pytest_cache/
+.taskmaster/
 .patchrail/
 .worktrees/
 worktrees/
+docs/superpowers/
 build/
 dist/
 *.egg-info/
