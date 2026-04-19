@@ -50,14 +50,17 @@ while [ "$#" -gt 0 ]; do
 done
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-install_cmd="pipx install --force --python $python_bin --editable $repo_root"
+safe_dir="${PATCHRAIL_PIPX_CWD:-${HOME:-/tmp}}"
+install_cmd="(cd $safe_dir && pipx install --python $python_bin --editable $repo_root)"
+uninstall_cmd="(cd $safe_dir && pipx uninstall patchrail)"
 inject_cmd="pipx inject patchrail langgraph"
 verify_cmd="patchrail --help"
 
 if [ "$dry_run" -eq 1 ]; then
+  printf '%s\n' "$uninstall_cmd"
   printf '%s\n' "$install_cmd"
   if [ "$with_langgraph" -eq 1 ]; then
-    printf '%s\n' "$inject_cmd"
+    printf '%s\n' "(cd $safe_dir && $inject_cmd)"
   fi
   printf '%s\n' "$verify_cmd"
   exit 0
@@ -78,12 +81,15 @@ if ! "$python_bin" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,
   exit 1
 fi
 
+mkdir -p "$safe_dir"
+
 echo "Installing Patchrail into pipx using $python_bin"
-pipx install --force --python "$python_bin" --editable "$repo_root"
+(cd "$safe_dir" && pipx uninstall patchrail >/dev/null 2>&1) || true
+(cd "$safe_dir" && pipx install --python "$python_bin" --editable "$repo_root")
 
 if [ "$with_langgraph" -eq 1 ]; then
   echo "Injecting optional langgraph runtime into the Patchrail pipx environment"
-  pipx inject patchrail langgraph
+  (cd "$safe_dir" && pipx inject patchrail langgraph)
 fi
 
 echo "Patchrail is installed. Run:"
