@@ -134,6 +134,7 @@ cross-provider または cross-access-mode の fallback が必要になった場
 - [MVP](docs/mvp.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
+- [Changelog](CHANGELOG.md)
 - [Agents Contract](AGENTS.md)
 
 ## License

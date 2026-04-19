@@ -148,6 +148,7 @@ patchrail --json status --task-id <task_id>
 - [MVP](docs/mvp.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
+- [Changelog](CHANGELOG.md)
 - [Agents Contract](AGENTS.md)
 - [Japanese README](README.ja.md)
 
