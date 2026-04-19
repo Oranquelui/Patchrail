@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import sys
 from typing import Any
 
 
@@ -55,55 +57,86 @@ def _render_config_init(payload: dict[str, Any]) -> str:
 def _render_start(payload: dict[str, Any]) -> str:
     start = payload["start"]
     lines = [
-        "Patchrail Start",
-        f"Home: {start['patchrail_home']}",
-        f"Config: {'created' if start['config_created'] else 'existing'}",
-        f"Workflow backend: {start['workflow_backend']}",
+        _style("Patchrail Start", "title"),
+        _style("supervised coding-agent control plane", "muted"),
+        "",
+        _panel(
+            "Project",
+            [
+                f"Home: {start['patchrail_home']}",
+                f"Config: {'created' if start['config_created'] else 'existing'}",
+                f"Workflow backend: {start['workflow_backend']}",
+            ],
+        ),
     ]
     preflight = start.get("preflight") or {}
     if preflight:
-        lines.append("Resolved candidates:")
+        candidate_lines: list[str] = []
         for role in ("planner", "reviewer", "executor"):
             item = preflight.get(role)
             if not item or item.get("selected_candidate") is None:
                 continue
             selected = item["selected_candidate"]
-            lines.append(
-                f"  {role.capitalize()}: {selected['candidate_name']} "
+            candidate_lines.append(
+                f"{role.capitalize()}: {selected['candidate_name']} "
                 f"({selected['provider']} {selected['access_mode']})"
             )
-    lines.append("Next:")
-    for step in start["next_steps"]:
-        lines.append(f"  {step}")
+        lines.extend(["", _panel("Resolved Candidates", candidate_lines)])
+    lines.extend(
+        [
+            "",
+            _panel(
+                "Next",
+                [
+                    f"1. {start['next_steps'][0]}",
+                    f"2. {start['next_steps'][1]}",
+                    f"3. {start['next_steps'][2]}",
+                    "Tip: use `patchrail --json ...` for automation.",
+                    "Tip: `.patchrail` is a local data directory, not a shell command.",
+                ],
+            ),
+        ]
+    )
     return "\n".join(lines)
 
 
 def _render_doctor(payload: dict[str, Any]) -> str:
     doctor = payload["doctor"]
     lines = [
-        "Patchrail Doctor",
-        f"Home: {doctor['patchrail_home']}",
-        f"Config: {'ready' if doctor['config_initialized'] else 'missing'}",
-        f"Workflow backend: {doctor['workflow_backend'] or 'uninitialized'}",
+        _style("Patchrail Doctor", "title"),
+        _style("readiness and policy summary", "muted"),
+        "",
+        _panel(
+            "Status",
+            [
+                f"Home: {doctor['patchrail_home']}",
+                f"Config: {'ready' if doctor['config_initialized'] else 'missing'}",
+                f"Workflow backend: {doctor['workflow_backend'] or 'uninitialized'}",
+            ],
+        ),
     ]
     preflight = doctor.get("preflight") or {}
     if preflight:
-        lines.append("Resolved candidates:")
+        candidate_lines: list[str] = []
         for role in ("planner", "reviewer", "executor"):
             item = preflight.get(role)
             if not item:
                 continue
             selected = item.get("selected_candidate")
             if selected is None:
-                lines.append(f"  {role.capitalize()}: no ready candidate")
+                candidate_lines.append(f"{role.capitalize()}: no ready candidate")
                 continue
-            lines.append(
+            candidate_lines.append(
                 f"  {role.capitalize()}: {selected['candidate_name']} "
                 f"({selected['provider']} {selected['access_mode']})"
             )
-    lines.append("Next:")
-    for step in doctor["next_steps"]:
-        lines.append(f"  {step}")
+        lines.extend(["", _panel("Resolved Candidates", candidate_lines)])
+    lines.extend(
+        [
+            "",
+            _panel("Next", [f"1. {step}" for step in doctor["next_steps"]]),
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -297,3 +330,42 @@ def _list_item_summary(key: str, item: dict[str, Any]) -> str:
 
 def _render_unknown(payload: dict[str, Any]) -> str:
     return str(payload)
+
+
+def _panel(title: str, lines: list[str]) -> str:
+    width = max(_terminal_width() - 2, 60)
+    inner_width = min(max((max((len(line) for line in lines), default=0) + 2), len(title) + 2), width - 2)
+    border = "+" + "-" * inner_width + "+"
+    rendered = [border, "| " + title.ljust(inner_width - 1) + "|", border]
+    for line in lines:
+        fitted = _fit_line(line, inner_width - 1)
+        rendered.append("| " + fitted.ljust(inner_width - 1) + "|")
+    rendered.append(border)
+    return "\n".join(_style(line, "panel") for line in rendered)
+
+
+def _terminal_width() -> int:
+    return shutil.get_terminal_size(fallback=(100, 24)).columns
+
+
+def _fit_line(text: str, width: int) -> str:
+    if len(text) <= width:
+        return text
+    if width <= 3:
+        return text[:width]
+    return text[: width - 3] + "..."
+
+
+def _style(text: str, style: str) -> str:
+    if not sys.stdout.isatty():
+        return text
+    colors = {
+        "title": "\033[1;96m",
+        "muted": "\033[0;37m",
+        "panel": "\033[0;36m",
+    }
+    reset = "\033[0m"
+    color = colors.get(style, "")
+    if not color:
+        return text
+    return f"{color}{text}{reset}"
