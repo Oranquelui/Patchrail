@@ -598,6 +598,93 @@ def test_plan_auto_can_use_subscription_planner_path(
     assert planned["plan"]["resolved_assignment"]["access_mode"] == "subscription"
 
 
+def test_review_auto_can_use_codex_subscription_reviewer_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail-review-auto-real"))
+    monkeypatch.setattr("patchrail.core.preflight._command_exists", lambda command: True)
+
+    def fake_run_status_command(command: list[str]) -> tuple[int, str, str]:
+        if command == ["claude", "auth", "status"]:
+            return (0, '{"loggedIn": true, "subscriptionType": "pro"}', "")
+        if command == ["codex", "login", "status"]:
+            return (0, "Logged in using ChatGPT", "")
+        return (1, "", "unsupported")
+
+    monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    class FakeExecutorSubscriptionRunner:
+        name = "claude_code"
+        mode = "subscription"
+        command = "provider-subscription:claude"
+
+        def run(self, task, plan, workspace_path, run_id):  # noqa: ANN001
+            return RunnerResult(
+                stdout="executor subscription runner stdout\n",
+                stderr="",
+                execution_summary="# Executor Subscription Execution Summary\n",
+                diff_summary="- Executor subscription diff summary\n",
+                cost_metrics=CostMetrics(
+                    prompt_tokens=12,
+                    completion_tokens=18,
+                    estimated_usd=0.03,
+                    elapsed_seconds=2.0,
+                ),
+                exit_code=0,
+            )
+
+    def fake_workflow_subprocess_run(command, input, capture_output, text, check, cwd):  # noqa: ANN001
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text('{"verdict":"pass","summary":"Codex subscription auto review"}\n')
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout='{"type":"thread.started"}\n{"type":"turn.completed"}\n',
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "patchrail.core.service.build_subscription_runner",
+        lambda candidate, runner_name: FakeExecutorSubscriptionRunner(),
+        raising=False,
+    )
+    monkeypatch.setattr("patchrail.workflows.local.subprocess.run", fake_workflow_subprocess_run)
+
+    exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Auto review real", "--description", "Use Codex subscription reviewer path"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, _ = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Plan before Codex review", "--step", "Plan"],
+        capsys,
+    )
+    assert exit_code == 0
+
+    exit_code, executed = run_cli(
+        ["run", "--task-id", task_id, "--runner", "claude_code", "--access-mode", "subscription"],
+        capsys,
+    )
+    assert exit_code == 0
+    run_id = executed["run"]["id"]
+
+    exit_code, reviewed = run_cli(["review", "--run-id", run_id, "--auto"], capsys)
+    assert exit_code == 0
+    assert reviewed["review"]["resolved_assignment"]["provider"] == "codex"
+    assert reviewed["review"]["resolved_assignment"]["access_mode"] == "subscription"
+    assert reviewed["review"]["verdict"] == "pass"
+    assert reviewed["review"]["summary"] == "Codex subscription auto review"
+    assert reviewed["review"]["workflow_backend"] == "local"
+    assert reviewed["review"]["workflow_metadata"]["generation_mode"] == "live_provider"
+
+
 def test_auto_plan_and_review_use_workflow_engine_contract(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

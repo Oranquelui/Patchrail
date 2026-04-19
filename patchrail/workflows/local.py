@@ -67,7 +67,12 @@ def _generate_review_content(
     if candidate.simulation:
         return _simulated_review(run)
 
-    payload = _generate_payload(candidate, _review_prompt(task, plan, run, bundle), role_label="reviewer")
+    payload = _generate_payload(
+        candidate,
+        _review_prompt(task, plan, run, bundle),
+        role_label="reviewer",
+        workspace_dir=Path(run.workspace_path),
+    )
     verdict = payload.get("verdict")
     summary = payload.get("summary")
     if verdict not in {"pass", "fail"}:
@@ -94,19 +99,31 @@ def _simulated_review(run: Run) -> tuple[ReviewVerdict, str]:
     return ReviewVerdict.PASS, "Automatic simulated review found no blocking issues in the persisted run artifacts."
 
 
-def _generate_payload(candidate: RoleCandidate, prompt: str, role_label: str) -> dict[str, Any]:
-    raw_text = _generate_text(candidate, prompt, role_label=role_label)
+def _generate_payload(
+    candidate: RoleCandidate,
+    prompt: str,
+    role_label: str,
+    workspace_dir: Path | None = None,
+) -> dict[str, Any]:
+    raw_text = _generate_text(candidate, prompt, role_label=role_label, workspace_dir=workspace_dir)
     payload = _load_json(raw_text)
     if not isinstance(payload, dict):
         raise PatchrailError(f"{role_label.capitalize()} response was not valid JSON.")
     return payload
 
 
-def _generate_text(candidate: RoleCandidate, prompt: str, role_label: str) -> str:
+def _generate_text(
+    candidate: RoleCandidate,
+    prompt: str,
+    role_label: str,
+    workspace_dir: Path | None = None,
+) -> str:
     if candidate.access_mode == AccessMode.API:
         return _complete_via_api(candidate, prompt)
     if candidate.access_mode == AccessMode.SUBSCRIPTION and candidate.provider == Provider.CLAUDE:
         return _complete_via_claude_subscription(candidate, prompt)
+    if candidate.access_mode == AccessMode.SUBSCRIPTION and candidate.provider == Provider.CODEX:
+        return _complete_via_codex_subscription(candidate, prompt, workspace_dir=workspace_dir)
     raise PatchrailError(
         f"Automatic {role_label} generation is not supported for candidate '{candidate.name}'. "
         "Use another access mode or adjust the role policy."
@@ -211,6 +228,47 @@ def _complete_via_claude_subscription(candidate: RoleCandidate, prompt: str) -> 
     if not isinstance(result, str) or not result.strip():
         raise PatchrailError("Claude subscription generation returned no result text.")
     return result.strip()
+
+
+def _complete_via_codex_subscription(
+    candidate: RoleCandidate,
+    prompt: str,
+    workspace_dir: Path | None,
+) -> str:
+    if workspace_dir is None:
+        raise PatchrailError("Codex subscription generation requires a workspace directory.")
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    last_message_path = workspace_dir / "codex-review-last-message.txt"
+    command = [
+        candidate.cli_command or "codex",
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "--json",
+        "--output-last-message",
+        str(last_message_path),
+        "-",
+    ]
+    if candidate.model:
+        command[2:2] = ["--model", candidate.model]
+    completed = subprocess.run(
+        command,
+        input=prompt,
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=workspace_dir,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise PatchrailError(f"Codex subscription generation failed: {detail}")
+    if not last_message_path.exists():
+        raise PatchrailError("Codex subscription generation produced no final message.")
+    result = last_message_path.read_text().strip()
+    if not result:
+        raise PatchrailError("Codex subscription generation produced an empty final message.")
+    return result
 
 
 def _extract_openai_text(payload: dict[str, Any]) -> str:

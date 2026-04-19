@@ -20,15 +20,14 @@
 - Full bilingual CLI surface beyond the current structured JSON and English error baseline.
 
 ## Continuation Queue
-1. Introduce live `review --auto` support for additional candidates once a safe reviewer runtime exists beyond `claude api`, while keeping reviewer verdicts subordinate to Patchrail's canonical records.
-2. Promote the optional `langgraph` backend from single-pass planner/reviewer scaffolding into richer subordinate workflow state without handing over approval, ledger, or artifact ownership.
-3. Introduce real diff ingestion so review results can reference concrete outputs instead of summary-only placeholders.
-4. Evolve the current optional runner trace schema beyond the MVP `trace.json` payload, borrowing the useful parts of Harbor-style trajectory data without drifting into a generic eval or RL format.
-5. Formalize the runner workspace path contract and reserved environment variables for task, plan, output, artifact, and trace exchange.
-6. Add time-bounded or one-shot semantics for fallback approvals once real adapters exist.
-7. Add richer list filters and historical views for large local stores beyond the current artifact-bundle and task-scoped read-side queries.
-8. Convert hook placeholders into event subscribers after approval and audit semantics are stable.
+1. Promote the optional `langgraph` backend from single-pass planner/reviewer scaffolding into richer subordinate workflow state without handing over approval, ledger, or artifact ownership.
+2. Introduce real diff ingestion so review results can reference concrete outputs instead of summary-only placeholders.
+3. Evolve the current optional runner trace schema beyond the MVP `trace.json` payload, borrowing the useful parts of Harbor-style trajectory data without drifting into a generic eval or RL format.
+4. Formalize the runner workspace path contract and reserved environment variables for task, plan, output, artifact, and trace exchange.
+5. Add time-bounded or one-shot semantics for fallback approvals once real adapters exist.
+6. Add richer list filters and historical views for large local stores beyond the current artifact-bundle and task-scoped read-side queries.
+7. Convert hook placeholders into event subscribers after approval and audit semantics are stable.
 
 ## Iteration Review
-- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path for both `local` and `real` presets, a first role ontology with local and real role-policy presets, provider-aware preflight checks, executor API runners with explicit `--access-mode api` selection, live Claude and Codex subscription executor runners, a workflow-engine seam for auto-generated `plan --auto` and `review --auto` flows, an optional LangGraph backend scaffold, manifest-style artifact metadata with digests and logical kinds, an initial optional `trace.json` runner artifact, an explicit fallback approval request path, standalone preflight snapshots, and list-oriented CLI navigation for the main local records including artifact-bundle history.
+- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path for both `local` and `real` presets, a first role ontology with local and real role-policy presets, provider-aware preflight checks, executor API runners with explicit `--access-mode api` selection, live Claude and Codex subscription executor runners, live Codex subscription reviewer automation, a workflow-engine seam for auto-generated `plan --auto` and `review --auto` flows, an optional LangGraph backend scaffold, manifest-style artifact metadata with digests and logical kinds, an initial optional `trace.json` runner artifact, an explicit fallback approval request path, standalone preflight snapshots, and list-oriented CLI navigation for the main local records including artifact-bundle history.
 - The next session should preserve the current ontology and approval boundaries while improving workflow backends, real provider adapters, diff ingestion, richer read-side filtering, and deeper runner traces instead of drifting toward benchmark-registry or evaluation-framework scope.

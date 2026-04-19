@@ -126,8 +126,8 @@ Planner / reviewer automation:
 - Local preset uses deterministic simulated generation for both planner and reviewer workflows.
 - Live workflow generation currently supports:
   - planner: `claude subscription`, `codex api`
-  - reviewer: `claude api`
-- `codex subscription` is currently an executor-only live path. Planner / reviewer auto workflows do not delegate to Codex subscription yet.
+  - reviewer: `codex subscription`, `claude api`
+- `codex subscription` is currently a reviewer / executor live path. Planner auto workflows do not delegate to Codex subscription yet.
 - Unsupported live candidates fail loudly instead of silently downgrading to manual or stub behavior.
 
 ## Storage Layout

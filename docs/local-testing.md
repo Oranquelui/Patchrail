@@ -107,7 +107,10 @@ python3 -m patchrail.cli config init --workflow-backend local
 python3 -m patchrail.cli plan --task-id <task_id> --auto
 python3 -m patchrail.cli review --run-id <run_id> --auto
 
-# real preset で reviewer を live API path に寄せる場合
+# real preset で reviewer を Codex subscription path に寄せる場合
+python3 -m patchrail.cli review --run-id <run_id> --auto
+
+# real preset で reviewer を Claude API path に寄せる場合
 python3 -m patchrail.cli review --run-id <run_id> --auto --access-mode api
 ```
 
