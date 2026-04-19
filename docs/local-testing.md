@@ -11,6 +11,7 @@ pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
 patchrail start
+patchrail start --once
 ```
 
 optional LangGraph runtime まで同じ install 導線で入れる場合:
@@ -19,6 +20,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```
 
 default output は人間向け summary です。machine-readable な JSON が必要な場合は `patchrail --json ...` を使います。`scripts/local_smoke_test.sh` は内部でこの mode を使います。
+`patchrail start` は TTY では interactive shell に入り、`patchrail start --once` は splash を 1 回だけ描画します。
 
 ## Fastest Path
 1. CLI を install する。
@@ -27,6 +29,7 @@ cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail start
 ```
+`patchrail start` に入った後は `doctor`, `list tasks`, `task create ...`, `status --task-id ...`, `exit` をそのまま打てます。slash shortcut は `/help`, `/doctor`, `/tasks`, `/start`, `/exit` を使えます。
 2. role policy を初期化し、preflight を確認する。
 ```bash
 # local preset

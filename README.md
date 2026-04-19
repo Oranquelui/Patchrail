@@ -18,6 +18,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 `patchrail` command 自体は package entrypoint として定義済みで、`scripts/install_cli.sh` はそれを `pipx` 経由で PATH に載せるだけです。`python3` が 3.12 未満の環境では、`--python "$(command -v python3.13)"` のように明示指定します。
 
 CLI は default で人間向けの要約表示を返します。script や automation で構造化出力が必要な場合だけ `patchrail --json ...` を使います。
+`patchrail start` は TTY では interactive shell を起動し、`patchrail start --once` はホーム画面だけを描画して終了します。
 
 ## Quickstart
 ```bash
@@ -25,6 +26,7 @@ cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 # deterministic local flow
 patchrail start
+patchrail start --once
 patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
 patchrail --json status --task-id <task_id>
@@ -41,6 +43,8 @@ patchrail list artifact-bundles --has-trace
 ```
 
 `config init` は `.patchrail/config/role-policy.json` と `.patchrail/config/workflow-backend.json` を作成します。デフォルトの `local` preset は local harness を使う simulation-backed な subscription 候補を含むため、実 API や実 CLI login がなくてもローカルでフロー確認できます。`config init --preset real` は live-readiness 用の role policy を書き出し、subscription 候補の preflight を実 CLI で確認します。workflow backend は CLI-first に `config init --workflow-backend local|langgraph` で保存し、`PATCHRAIL_WORKFLOW_BACKEND` は一時 override としてだけ使います。
+
+interactive shell では `doctor`, `list tasks`, `task create ...`, `status --task-id ...` のような既存 subcommand をそのまま打てます。`/help`, `/doctor`, `/tasks`, `/start`, `exit` も shortcut として受け付けます。
 
 `real` preset の subscription preflight は現在こう動きます。
 - `codex`: `codex login status`

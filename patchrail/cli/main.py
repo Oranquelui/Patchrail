@@ -6,6 +6,7 @@ import sys
 from typing import Any, Sequence
 
 from patchrail.core.exceptions import PatchrailError
+from patchrail.cli.shell import run_start_shell, should_start_shell
 from patchrail.core.service import PatchrailApp
 from patchrail.cli.render import render_payload
 
@@ -30,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--preset", choices=["local", "real"], default="local")
     start_parser.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
+    start_parser.add_argument("--once", action="store_true", help="Render the home screen once and exit.")
 
     subparsers.add_parser("doctor")
 
@@ -107,8 +109,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def execute(args: argparse.Namespace) -> dict[str, Any]:
-    app = PatchrailApp.from_environment()
+def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[str, Any]:
+    if app is None:
+        app = PatchrailApp.from_environment()
 
     if args.command == "task" and args.task_command == "create":
         return app.create_task(title=args.title, description=args.description)
@@ -182,11 +185,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.print_help()
         return 0
     args = parser.parse_args(argv_list)
+    app = PatchrailApp.from_environment()
     try:
-        payload = execute(args)
+        payload = execute(args, app=app)
     except PatchrailError as exc:
         print(str(exc), file=sys.stderr)
         return 1
+
+    if should_start_shell(args):
+        return run_start_shell(app, payload, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))

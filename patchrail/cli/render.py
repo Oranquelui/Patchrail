@@ -91,6 +91,7 @@ def _render_start(payload: dict[str, Any]) -> str:
                     f"1. {start['next_steps'][0]}",
                     f"2. {start['next_steps'][1]}",
                     f"3. {start['next_steps'][2]}",
+                    "Tip: in the interactive shell, type `help` or `exit`.",
                     "Tip: use `patchrail --json ...` for automation.",
                     "Tip: `.patchrail` is a local data directory, not a shell command.",
                 ],

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
@@ -8,8 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from patchrail.cli.shell import run_start_shell
 from patchrail.cli.main import main
 from patchrail.core.exceptions import PatchrailError
+from patchrail.core.service import PatchrailApp
 from patchrail.models.entities import CostMetrics
 from patchrail.models.entities import ReviewVerdict
 from patchrail.runners.base import RunnerResult
@@ -111,6 +114,68 @@ def test_start_defaults_to_human_readable_output(
     assert "Workflow backend: local" in stdout
     assert 'patchrail task create --title "First task" --description "Describe the work"' in stdout
     assert "sh scripts/local_smoke_test.sh" in stdout
+
+
+def test_start_once_forces_one_shot_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, stdout, stderr = run_cli_text(["start", "--once"], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout.startswith("Patchrail Start")
+    assert "Tip: `.patchrail` is a local data directory, not a shell command." in stdout
+
+
+def test_start_shell_executes_commands_until_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    app = PatchrailApp.from_environment()
+    start_payload = app.start()
+    stdin = io.StringIO('doctor\nlist tasks\nexit\n')
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_start_shell(app, start_payload, stdin=stdin, stdout=stdout, stderr=stderr)
+    rendered = stdout.getvalue()
+
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    assert "Patchrail Start" in rendered
+    assert "Patchrail Doctor" in rendered
+    assert "Tasks: 0" in rendered
+    assert "patchrail> " in rendered
+    assert "Exiting Patchrail shell." in rendered
+
+
+def test_main_routes_start_to_shell_in_interactive_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+    seen: dict[str, object] = {}
+
+    def fake_should_start_shell(args: object) -> bool:
+        return True
+
+    def fake_run_start_shell(app: object, payload: dict[str, object], stdin: object, stdout: object, stderr: object) -> int:
+        seen["payload"] = payload
+        return 7
+
+    monkeypatch.setattr("patchrail.cli.main.should_start_shell", fake_should_start_shell)
+    monkeypatch.setattr("patchrail.cli.main.run_start_shell", fake_run_start_shell)
+
+    exit_code = main(["start"])
+
+    assert exit_code == 7
+    assert seen["payload"]["start"]["workflow_backend"] == "local"
 
 
 def test_json_flag_preserves_structured_output(

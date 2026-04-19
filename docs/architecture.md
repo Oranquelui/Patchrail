@@ -5,6 +5,7 @@ Patchrail is a local-first control plane that records supervised coding-agent wo
 
 ## Core Modules
 - `patchrail.cli`: `argparse`-based command surface plus a thin render layer for task, config, start, doctor, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands. Human-readable output is the operator default; `--json` preserves machine-readable automation output.
+- `patchrail.cli.shell`: a small interactive shell wrapper for `patchrail start` in TTY sessions. It reuses the canonical CLI parser and service layer instead of adding a second state machine.
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
 - `patchrail.workflows`: pluggable auto plan/review backend contract plus the default local backend and an optional LangGraph-backed planner/reviewer scaffold.
 - `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
