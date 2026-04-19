@@ -10,6 +10,7 @@ brew install pipx
 pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
+patchrail doctor
 ```
 
 optional LangGraph runtime まで同じ install 導線で入れる場合:
@@ -22,6 +23,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```bash
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
+patchrail doctor
 ```
 2. role policy を初期化し、preflight を確認する。
 ```bash

@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_init.add_argument("--preset", choices=["local", "real"], default="local")
     config_init.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
 
+    subparsers.add_parser("doctor")
+
     plan_parser = subparsers.add_parser("plan")
     plan_parser.add_argument("--task-id", required=True)
     plan_parser.add_argument("--summary")
@@ -106,6 +108,8 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
         return app.create_task(title=args.title, description=args.description)
     if args.command == "config" and args.config_command == "init":
         return app.init_config(preset=args.preset, workflow_backend=args.workflow_backend)
+    if args.command == "doctor":
+        return app.doctor()
     if args.command == "plan":
         return app.create_plan(
             task_id=args.task_id,

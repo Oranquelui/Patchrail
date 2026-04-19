@@ -31,6 +31,50 @@ def test_cli_without_command_prints_help_and_exits_zero(capsys: pytest.CaptureFi
     assert captured.err == ""
 
 
+def test_doctor_reports_bootstrap_steps_before_config_init(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, payload = run_cli(["doctor"], capsys)
+
+    assert exit_code == 0
+    assert payload["doctor"]["config_initialized"] is False
+    assert payload["doctor"]["workflow_backend"] is None
+    assert payload["doctor"]["preflight"] == {}
+    assert payload["doctor"]["next_steps"] == [
+        "patchrail config init",
+        "sh scripts/local_smoke_test.sh",
+    ]
+
+
+def test_doctor_reports_preflight_summary_after_config_init(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, payload = run_cli(["doctor"], capsys)
+
+    assert exit_code == 0
+    doctor = payload["doctor"]
+    assert doctor["config_initialized"] is True
+    assert doctor["workflow_backend"] == "local"
+    assert doctor["next_steps"] == [
+        "patchrail preflight --role executor --runner auto",
+        "sh scripts/local_smoke_test.sh",
+    ]
+    assert doctor["preflight"]["planner"]["selected_candidate"]["candidate_name"] == "claude_subscription_planner"
+    assert doctor["preflight"]["reviewer"]["selected_candidate"]["candidate_name"] == "codex_subscription_reviewer"
+    assert doctor["preflight"]["executor"]["selected_candidate"]["candidate_name"] == "claude_subscription_executor"
+
+
 def test_happy_path_persists_state_artifacts_and_ledgers(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

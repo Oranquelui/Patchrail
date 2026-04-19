@@ -75,6 +75,35 @@ class PatchrailApp:
             "workflow": {"path": str(self.config.workflow_path), "backend": self.config.load_workflow_backend()},
         }
 
+    def doctor(self) -> dict[str, Any]:
+        config_initialized = self.config.config_path.exists() and self.config.workflow_path.exists()
+        workflow_backend = self.config.load_workflow_backend() if self.config.workflow_path.exists() else None
+        payload: dict[str, Any] = {
+            "patchrail_home": str(self.store.root),
+            "config_path": str(self.config.config_path),
+            "workflow_path": str(self.config.workflow_path),
+            "config_initialized": config_initialized,
+            "workflow_backend": workflow_backend,
+            "preflight": {},
+        }
+        if not config_initialized:
+            payload["next_steps"] = [
+                "patchrail config init",
+                "sh scripts/local_smoke_test.sh",
+            ]
+            return {"doctor": payload}
+
+        payload["preflight"] = {
+            "planner": self.preflight(role_name="planner"),
+            "reviewer": self.preflight(role_name="reviewer"),
+            "executor": self.preflight(role_name="executor", runner_name="auto"),
+        }
+        payload["next_steps"] = [
+            "patchrail preflight --role executor --runner auto",
+            "sh scripts/local_smoke_test.sh",
+        ]
+        return {"doctor": payload}
+
     def preflight(
         self,
         role_name: str,

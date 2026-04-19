@@ -9,6 +9,7 @@ brew install pipx
 pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
+patchrail doctor
 
 # optional workflow backend
 sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
@@ -21,6 +22,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 # deterministic local flow
+patchrail doctor
 patchrail config init
 patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
