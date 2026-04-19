@@ -63,7 +63,6 @@ def _render_start(payload: dict[str, Any]) -> str:
             _panel(
                 "Project",
                 [
-                    f"Home: {start['patchrail_home']}",
                     f"Config: {'created' if start['config_created'] else 'existing'}",
                     f"Workflow backend: {start['workflow_backend']}",
                 ],
@@ -123,7 +122,6 @@ def _render_doctor(payload: dict[str, Any]) -> str:
         _panel(
             "Status",
             [
-                f"Home: {doctor['patchrail_home']}",
                 f"Config: {'ready' if doctor['config_initialized'] else 'missing'}",
                 f"Workflow backend: {doctor['workflow_backend'] or 'uninitialized'}",
             ],

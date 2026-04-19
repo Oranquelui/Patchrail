@@ -111,6 +111,7 @@ def test_start_defaults_to_human_readable_output(
     assert stderr == ""
     assert stdout.startswith(" ____       _       _")
     assert "Patchrail Start" in stdout
+    assert "Home: " not in stdout
     assert "Config: created" in stdout
     assert "Workflow backend: local" in stdout
     assert 'patchrail task create --title "First task" --description "Describe the work"' in stdout
@@ -130,6 +131,7 @@ def test_start_once_forces_one_shot_output(
     assert stderr == ""
     assert stdout.startswith(" ____       _       _")
     assert "Patchrail Start" in stdout
+    assert "Home: " not in stdout
     assert "Tip: `.patchrail` is a local data directory, not a shell command." in stdout
 
 
@@ -153,6 +155,7 @@ def test_start_shell_executes_commands_until_exit(
     assert " ____       _       _" in rendered
     assert "Patchrail Start" in rendered
     assert "Patchrail Doctor" in rendered
+    assert "Home: " not in rendered
     assert "Tasks: 0" in rendered
     assert "patchrail> " in rendered
     assert "Exiting Patchrail shell." in rendered
@@ -256,6 +259,7 @@ def test_doctor_defaults_to_human_readable_output(
     assert exit_code == 0
     assert stderr == ""
     assert stdout.startswith("Patchrail Doctor")
+    assert "Home: " not in stdout
     assert "Config: ready" in stdout
     assert "Workflow backend: local" in stdout
     assert "Planner: claude_subscription_planner" in stdout
