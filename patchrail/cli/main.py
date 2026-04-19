@@ -165,7 +165,11 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    argv_list = list(argv) if argv is not None else sys.argv[1:]
+    if not argv_list:
+        parser.print_help()
+        return 0
+    args = parser.parse_args(argv_list)
     try:
         payload = execute(args)
     except PatchrailError as exc:

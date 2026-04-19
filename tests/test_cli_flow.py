@@ -22,6 +22,15 @@ def run_cli(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, d
     return exit_code, payload
 
 
+def test_cli_without_command_prints_help_and_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = main([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "usage: patchrail" in captured.out
+    assert captured.err == ""
+
+
 def test_happy_path_persists_state_artifacts_and_ledgers(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
