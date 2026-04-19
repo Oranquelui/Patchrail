@@ -9,6 +9,8 @@ description = "Local-first supervised coding-agent control plane"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Patchrail" }]
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = []
 
 [project.optional-dependencies]
@@ -19,6 +21,7 @@ patchrail = "patchrail.cli.main:run"
 
 [tool.setuptools]
 include-package-data = false
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 include = ["patchrail*"]

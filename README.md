@@ -126,3 +126,6 @@ cross-provider または cross-access-mode の fallback が必要になった場
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
 - [Agents Contract](AGENTS.md)
+
+## License
+MIT. See [LICENSE](LICENSE).
