@@ -56,19 +56,20 @@ def _render_config_init(payload: dict[str, Any]) -> str:
 
 def _render_start(payload: dict[str, Any]) -> str:
     start = payload["start"]
-    lines = [
-        _style("Patchrail Start", "title"),
-        _style("supervised coding-agent control plane", "muted"),
-        "",
-        _panel(
-            "Project",
-            [
-                f"Home: {start['patchrail_home']}",
-                f"Config: {'created' if start['config_created'] else 'existing'}",
-                f"Workflow backend: {start['workflow_backend']}",
-            ],
-        ),
-    ]
+    lines = _brand_header()
+    lines.extend(
+        [
+            "",
+            _panel(
+                "Project",
+                [
+                    f"Home: {start['patchrail_home']}",
+                    f"Config: {'created' if start['config_created'] else 'existing'}",
+                    f"Workflow backend: {start['workflow_backend']}",
+                ],
+            ),
+        ]
+    )
     preflight = start.get("preflight") or {}
     if preflight:
         candidate_lines: list[str] = []
@@ -99,6 +100,18 @@ def _render_start(payload: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def _brand_header() -> list[str]:
+    return [
+        _style(" ____       _       _                _ _ ", "logo"),
+        _style("|  _ \\ __ _| |_ ___| |__  _ __ __ _(_) |", "logo"),
+        _style("| |_) / _` | __/ __| '_ \\| '__/ _` | | |", "logo"),
+        _style("|  __/ (_| | || (__| | | | | | (_| | | |", "logo"),
+        _style("|_|   \\__,_|\\__\\___|_| |_|_|  \\__,_|_|_|", "logo"),
+        _style("Patchrail Start", "title"),
+        _style("supervised coding-agent control plane", "muted"),
+    ]
 
 
 def _render_doctor(payload: dict[str, Any]) -> str:
@@ -361,6 +374,7 @@ def _style(text: str, style: str) -> str:
     if not sys.stdout.isatty():
         return text
     colors = {
+        "logo": "\033[38;5;213m",
         "title": "\033[1;96m",
         "muted": "\033[0;37m",
         "panel": "\033[0;36m",
