@@ -7,10 +7,12 @@ from typing import Any, Sequence
 
 from patchrail.core.exceptions import PatchrailError
 from patchrail.core.service import PatchrailApp
+from patchrail.cli.render import render_payload
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="patchrail")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     task_parser = subparsers.add_parser("task")
@@ -180,7 +182,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(render_payload(args, payload))
     return 0
 
 

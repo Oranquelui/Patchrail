@@ -17,6 +17,8 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 
 `patchrail` command 自体は package entrypoint として定義済みで、`scripts/install_cli.sh` はそれを `pipx` 経由で PATH に載せるだけです。`python3` が 3.12 未満の環境では、`--python "$(command -v python3.13)"` のように明示指定します。
 
+CLI は default で人間向けの要約表示を返します。script や automation で構造化出力が必要な場合だけ `patchrail --json ...` を使います。
+
 ## Quickstart
 ```bash
 cd /path/to/Patchrail
@@ -26,6 +28,7 @@ patchrail doctor
 patchrail config init
 patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
+patchrail --json status --task-id <task_id>
 # live readiness checks
 patchrail config init --preset real --workflow-backend local
 patchrail preflight --role executor --runner auto

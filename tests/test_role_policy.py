@@ -10,7 +10,7 @@ from patchrail.cli.main import main
 
 
 def run_cli(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict[str, object]]:
-    exit_code = main(args)
+    exit_code = main(["--json", *args])
     captured = capsys.readouterr()
     payload = json.loads(captured.out) if captured.out.strip() else {}
     return exit_code, payload
@@ -209,7 +209,7 @@ def test_cross_provider_fallback_creates_pending_request(
     )
     assert exit_code == 0
 
-    exit_code = main(["run", "--task-id", task_id, "--runner", "auto"])
+    exit_code = main(["--json", "run", "--task-id", task_id, "--runner", "auto"])
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "approval" in captured.err.lower()
@@ -270,7 +270,7 @@ def test_approved_fallback_allows_retry_to_proceed(
     )
     assert exit_code == 0
 
-    exit_code = main(["run", "--task-id", task_id, "--runner", "auto"])
+    exit_code = main(["--json", "run", "--task-id", task_id, "--runner", "auto"])
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "approve-fallback" in captured.err

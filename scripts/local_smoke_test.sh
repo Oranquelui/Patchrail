@@ -26,7 +26,7 @@ fi
 export PATCHRAIL_HOME
 
 run_patchrail() {
-  "$PYTHON_BIN" -m patchrail.cli "$@"
+  "$PYTHON_BIN" -m patchrail.cli --json "$@"
 }
 
 json_query() {

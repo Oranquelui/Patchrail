@@ -16,10 +16,16 @@ from patchrail.runners.base import RunnerResult
 
 
 def run_cli(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict[str, object]]:
-    exit_code = main(args)
+    exit_code = main(["--json", *args])
     captured = capsys.readouterr()
     payload = json.loads(captured.out) if captured.out.strip() else {}
     return exit_code, payload
+
+
+def run_cli_text(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, str, str]:
+    exit_code = main(args)
+    captured = capsys.readouterr()
+    return exit_code, captured.out, captured.err
 
 
 def test_cli_without_command_prints_help_and_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -28,6 +34,40 @@ def test_cli_without_command_prints_help_and_exits_zero(capsys: pytest.CaptureFi
 
     assert exit_code == 0
     assert "usage: patchrail" in captured.out
+    assert captured.err == ""
+
+
+def test_config_init_defaults_to_human_readable_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, stdout, stderr = run_cli_text(["config", "init"], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout.startswith("Initialized Patchrail config")
+    assert "Preset: local" in stdout
+    assert "Workflow backend: local" in stdout
+    assert "patchrail doctor" in stdout
+    assert not stdout.lstrip().startswith("{")
+
+
+def test_json_flag_preserves_structured_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code = main(["--json", "config", "init"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["workflow"]["backend"] == "local"
     assert captured.err == ""
 
 
@@ -73,6 +113,28 @@ def test_doctor_reports_preflight_summary_after_config_init(
     assert doctor["preflight"]["planner"]["selected_candidate"]["candidate_name"] == "claude_subscription_planner"
     assert doctor["preflight"]["reviewer"]["selected_candidate"]["candidate_name"] == "codex_subscription_reviewer"
     assert doctor["preflight"]["executor"]["selected_candidate"]["candidate_name"] == "claude_subscription_executor"
+
+
+def test_doctor_defaults_to_human_readable_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, stdout, stderr = run_cli_text(["doctor"], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout.startswith("Patchrail Doctor")
+    assert "Config: ready" in stdout
+    assert "Workflow backend: local" in stdout
+    assert "Planner: claude_subscription_planner" in stdout
+    assert "Reviewer: codex_subscription_reviewer" in stdout
+    assert "Executor: claude_subscription_executor" in stdout
 
 
 def test_happy_path_persists_state_artifacts_and_ledgers(
@@ -190,7 +252,7 @@ def test_cli_rejects_invalid_state_transitions(
 ) -> None:
     monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
 
-    exit_code = main(["task", "create", "--title", "Guard rails", "--description", "Transition checks"])
+    exit_code = main(["--json", "task", "create", "--title", "Guard rails", "--description", "Transition checks"])
     task_id = json.loads(capsys.readouterr().out)["task"]["id"]
     assert exit_code == 0
 

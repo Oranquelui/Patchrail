@@ -17,7 +17,7 @@
 - Autonomous merges or approvals.
 - Multi-user coordination or remote sync.
 - Infra control center behavior beyond hook contracts.
-- Full bilingual CLI surface beyond the current structured JSON and English error baseline.
+- Full bilingual CLI surface beyond the current human-readable default output, explicit `--json` automation mode, and English error baseline.
 
 ## Continuation Queue
 1. Promote the optional `langgraph` backend from single-pass planner/reviewer scaffolding into richer subordinate workflow state without handing over approval, ledger, or artifact ownership.
@@ -29,5 +29,5 @@
 7. Convert hook placeholders into event subscribers after approval and audit semantics are stable.
 
 ## Iteration Review
-- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path for both `local` and `real` presets, a first role ontology with local and real role-policy presets, provider-aware preflight checks, executor API runners with explicit `--access-mode api` selection, live Claude and Codex subscription executor runners, live Codex subscription reviewer automation, a workflow-engine seam for auto-generated `plan --auto` and `review --auto` flows, an optional LangGraph backend scaffold, manifest-style artifact metadata with digests and logical kinds, an initial optional `trace.json` runner artifact, an explicit fallback approval request path, standalone preflight snapshots, and list-oriented CLI navigation for the main local records including artifact-bundle history.
+- This iteration establishes the durable contract, local storage layout, core state machine, CLI skeleton, isolated run workspaces, built-in local smoke-testing path for both `local` and `real` presets, a first role ontology with local and real role-policy presets, provider-aware preflight checks, executor API runners with explicit `--access-mode api` selection, live Claude and Codex subscription executor runners, live Codex subscription reviewer automation, a workflow-engine seam for auto-generated `plan --auto` and `review --auto` flows, an optional LangGraph backend scaffold, manifest-style artifact metadata with digests and logical kinds, an initial optional `trace.json` runner artifact, an explicit fallback approval request path, standalone preflight snapshots, list-oriented CLI navigation for the main local records including artifact-bundle history, a `doctor` onboarding command, and human-readable default CLI output with explicit `--json` automation mode.
 - The next session should preserve the current ontology and approval boundaries while improving workflow backends, real provider adapters, diff ingestion, richer read-side filtering, and deeper runner traces instead of drifting toward benchmark-registry or evaluation-framework scope.
