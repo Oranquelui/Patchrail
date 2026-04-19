@@ -37,6 +37,13 @@ def test_english_readme_exists_without_japanese_text() -> None:
 
     assert not JAPANESE_TEXT_RE.search(readme)
     assert "README.ja.md" in readme
+    assert "docs/assets/patchrail-start.jpg" in readme
+
+
+def test_readme_screenshot_asset_exists() -> None:
+    screenshot = REPO_ROOT / "docs" / "assets" / "patchrail-start.jpg"
+
+    assert screenshot.exists()
 
 
 def test_japanese_readme_exists_and_links_back_to_english_readme() -> None:

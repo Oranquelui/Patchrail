@@ -2,6 +2,10 @@
 
 Patchrail is a local-first supervised coding-agent control plane. It stays focused on a CLI-first, headless-core-first workflow that records `task -> plan -> run -> review -> approval` as explicit local state transitions, together with artifact bundles, decision traces, and approval ledgers.
 
+![Patchrail start screen](docs/assets/patchrail-start.jpg)
+
+Patchrail keeps coding-agent supervision in a local CLI instead of hiding planning, review, approval, and artifacts behind a backend runtime.
+
 Japanese usage notes live in [README.ja.md](README.ja.md).
 
 ## Why Patchrail
