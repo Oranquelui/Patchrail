@@ -1,6 +1,6 @@
 # Patchrail
 
-Patchrail is a local-first supervised coding-agent control plane. It stays focused on a CLI-first, headless-core-first workflow that records `task -> plan -> run -> review -> approval` as explicit local state transitions, together with artifact bundles, decision traces, and approval ledgers.
+Patchrail is a local-first supervised coding-agent control plane for future-anchored product execution. It stays focused on a CLI-first, headless-core-first workflow that records `task -> plan -> run -> review -> approval` as explicit local state transitions, together with artifact bundles, decision traces, and approval ledgers.
 
 ![Patchrail start screen](patchrail-start.jpg)
 
@@ -12,8 +12,35 @@ Japanese usage notes live in [README.ja.md](README.ja.md).
 
 - Keep the canonical workflow record in Patchrail rather than in a backend runtime.
 - Preserve clear role separation across planner, reviewer, executor, and human approver.
+- Constrain present implementation work with operator-defined completion, ontology, and scope documents rather than letting the next tool call decide the shape of the product.
 - Make approval boundaries, fallback approvals, artifacts, and decision traces inspectable from disk.
 - Support optional workflow backends, including LangGraph, without handing over canonical state ownership.
+
+## Phase 1 Direction
+
+The next planning layer is aimed at turning Patchrail into a supervised control plane for product definition before execution starts.
+
+Phase 1 is structured around two onboarding passes:
+
+- `machine/runtime onboarding`: select the provider set, access modes, and workflow backend that this machine can supervise safely
+- `project/planning onboarding`: define the task, `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and then generate the canonical plan
+
+The planned brief sequence is intentionally ordered:
+
+1. `Future Completion Brief`: describe what finished looks like, the invariants that must hold, the failure conditions, and the non-goals.
+2. `Ontology Brief`: define what exists, what does not exist, who owns what, and where approval or artifact boundaries sit.
+3. `Product Brief`: define the user problem, the MVP boundary, and the acceptance criteria.
+4. `Plan`: convert those constraints into executable implementation steps that Patchrail can supervise.
+
+Patchrail will continue to own the canonical `Task`, `Plan`, `Run`, `ReviewResult`, `ApprovalRecord`, ledgers, and artifact bundles. The future, ontology, and product briefs are planned as plan-scoped companion artifacts or metadata, not as a second canonical state machine.
+
+Phase 1 also gives the three live providers distinct planning roles instead of treating them as interchangeable model slots:
+
+- `Codex / OpenAI`: structure the plan and preserve the supervisory viewpoint
+- `Claude`: expand the implementation path and keep the plan coherent across longer reasoning spans
+- `Grok`: challenge weak assumptions, missing constraints, and product drift
+
+The goal is triangulated planning with explicit traces, not generic multi-model fan-out.
 
 ## Install CLI
 

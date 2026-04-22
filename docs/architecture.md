@@ -3,6 +3,8 @@
 ## System Overview
 Patchrail is a local-first control plane that records supervised coding-agent workflows as explicit state transitions. The MVP is a headless core with a thin CLI wrapper. It accepts a task, stores a plan, resolves role assignments through a provider and access-mode policy, records a run, persists an artifact bundle, captures a review result, and requires an explicit human approval or rejection before completion.
 
+The current MVP proves the canonical workflow record and approval boundary. The next planning phase extends the front of that workflow so operators can define what finished looks like, which concepts are real, and what scope is in-bounds before implementation begins. That phase remains subordinate to the existing canonical state machine rather than replacing it.
+
 ## Core Modules
 - `patchrail.cli`: `argparse`-based command surface plus a thin render layer for task, config, start, doctor, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands. Human-readable output is the operator default; `--json` preserves machine-readable automation output.
 - `patchrail.cli.shell`: a small interactive shell wrapper for `patchrail start` in TTY sessions. It reuses the canonical CLI parser and service layer instead of adding a second state machine.
@@ -15,6 +17,34 @@ Patchrail is a local-first control plane that records supervised coding-agent wo
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
 - `patchrail.approval`: explicit task approval and fallback approval request handling plus ledger appends.
 - `patchrail.artifacts`: artifact bundle creation and lookup.
+
+## Phase 1 Planning Direction
+The next planned layer adds future-anchored planning without creating new top-level canonical records.
+
+Planned operator flow:
+1. `machine/runtime onboarding`
+2. `project/planning onboarding`
+3. canonical `Plan`
+4. canonical `Run`
+5. canonical `ReviewResult`
+6. canonical `ApprovalRecord`
+
+Planned planning artifacts:
+- `Future Completion Brief`: the target completed state, invariant constraints, failure conditions, and non-goals
+- `Ontology Brief`: the entities, relations, ownership boundaries, approval boundaries, artifact boundaries, and explicit non-entities
+- `Product Brief`: the user problem, MVP scope, acceptance criteria, and out-of-scope commitments
+- `Triangulated Plan Summary`: a comparison layer across distinct planning participants before Patchrail stores the canonical plan
+
+Phase 1 constraints:
+- These briefs are plan-scoped companion artifacts or metadata, not new canonical records.
+- The canonical lifecycle remains `Task -> Plan -> Run -> ReviewResult -> ApprovalRecord`.
+- Approval meaning, ledgers, and artifact ownership remain Patchrail-owned.
+- LangGraph may help produce planning candidates, but it does not own the planning ontology, approval semantics, or canonical state transitions.
+
+Planned provider roles for supervised planning:
+- `Codex / OpenAI`: supervisory structuring lens for the canonical plan
+- `Claude`: implementation expansion lens for coherent build paths
+- `Grok`: challenge lens for contradiction finding, missing constraints, and drift detection
 
 ## Role Ontology
 Patchrail treats role selection as an auditable domain object, not an implicit runtime choice.
@@ -44,6 +74,7 @@ Hard rules:
 ## State Model
 - `Task` is the supervisory anchor for a unit of work.
 - `Plan` belongs to a task, must exist before a run can start, and stores the resolved planner assignment plus preflight evidence. Auto-generated plans may also store auxiliary workflow backend metadata, but the canonical plan record remains Patchrail-owned.
+- In the planned Phase 1 layer, a `Plan` may also reference a `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and triangulated planning metadata as companion artifacts. Those supporting documents do not replace the canonical plan record.
 - `Run` records runner assignment, elapsed time, synthetic output, artifact bundle identity, and the resolved executor assignment plus preflight evidence.
 - `ReviewResult` records the reviewer verdict, rationale, and the resolved reviewer assignment plus preflight evidence. Auto-generated reviews may also store auxiliary workflow backend metadata, but approval meaning remains outside the backend.
 - `ApprovalRecord` records the human decision and rationale after review.
@@ -93,6 +124,25 @@ Preflight checks:
 `grok` is API-only in the default policy set. Patchrail does not currently ship a default `grok subscription` candidate because the CLI contract is not yet stable enough for supervised runtime use.
 
 The default `local` policy intentionally uses simulation-backed candidates so the ontology and approval rules can be tested without live provider credentials. The `real` preset switches readiness truthfulness on and enables only the live paths that Patchrail can currently supervise safely.
+
+## Onboarding Model
+Patchrail is moving toward a two-pass onboarding model.
+
+`machine/runtime onboarding` configures what this machine can supervise:
+- preset selection such as `local` or `real`
+- provider set selection across `codex`, `claude`, and `grok`
+- access-mode selection across `api` and `subscription`
+- workflow backend selection across `local` and optional `langgraph`
+- readiness verification through `doctor` and role preflight
+
+`project/planning onboarding` configures what this project is trying to finish:
+- create the task anchor
+- define the `Future Completion Brief`
+- define the `Ontology Brief`
+- define the `Product Brief`
+- generate a canonical plan from those constraints
+
+Phase 1 treats the three-provider setup as recommended rather than universally required. If one or more providers are unavailable, Patchrail should remain usable while surfacing that triangulated planning is degraded.
 
 ## Runner Model
 The runner contract is intentionally narrow:
