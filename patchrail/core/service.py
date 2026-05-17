@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -10,13 +11,16 @@ from patchrail.core.assignment import resolve_role_assignment
 from patchrail.artifacts.service import ArtifactService
 from patchrail.core.exceptions import PatchrailError
 from patchrail.core.hooks import HookEvent, HookRegistry
+from patchrail.core.layers import PLANNING_LAYER_BY_KIND
 from patchrail.core.ids import generate_id, utc_now
 from patchrail.core.state_machine import require_state, transition_task
 from patchrail.models.entities import (
     ApprovalDecision,
+    BriefKind,
     DecisionTrace,
     FallbackApprovalStatus,
     Plan,
+    PlanningBrief,
     PlanStatus,
     PreflightPhase,
     PreflightSnapshot,
@@ -36,6 +40,12 @@ from patchrail.runners.stub import build_runner
 from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
 from patchrail.workflows import WorkflowEngine, build_workflow_engine
+
+_BRIEF_KIND_ORDER = {
+    BriefKind.FUTURE: 0,
+    BriefKind.ONTOLOGY: 1,
+    BriefKind.PRODUCT: 2,
+}
 
 
 class PatchrailApp:
@@ -66,6 +76,92 @@ class PatchrailApp:
         self.store.save_task(task)
         self._append_trace(task.id, "task.created", f"Created task {task.id}.", description)
         return {"task": serialize(task)}
+
+    def create_brief(self, task_id: str, kind_name: str, file_path: str) -> dict[str, Any]:
+        kind = self._brief_kind(kind_name)
+        task = self.store.load_task(task_id)
+        if task.plan_id is not None:
+            raise PatchrailError(
+                "Briefs must be created before the canonical plan so planning_briefs remain an immutable plan snapshot."
+            )
+        existing_same_kind = [brief for brief in self._briefs_for_task(task.id) if brief.kind == kind]
+        if existing_same_kind:
+            raise PatchrailError(
+                f"A {kind.value} brief already exists for task {task.id}. Create the canonical plan with the existing brief, or start a new task for a different {kind.value} boundary."
+            )
+        source_path = Path(file_path).expanduser()
+        if not source_path.exists() or not source_path.is_file():
+            raise PatchrailError(f"Brief source file not found: {source_path}")
+        content = source_path.read_text()
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        brief_id = generate_id("brief")
+        brief = PlanningBrief(
+            id=brief_id,
+            task_id=task.id,
+            kind=kind,
+            source_path=str(source_path),
+            storage_path=str(self.store.brief_path(brief_id)),
+            content=content,
+            sha256=digest,
+            created_at=utc_now(),
+            attached_plan_id=task.plan_id,
+        )
+        self.store.save_planning_brief(brief)
+        self._append_trace(
+            task.id,
+            "brief.created",
+            f"Stored {kind.value} brief {brief.id} for task {task.id}.",
+            metadata={
+                "brief_id": brief.id,
+                "kind": kind.value,
+                "attached_plan_id": brief.attached_plan_id,
+                "sha256": digest,
+            },
+        )
+        return {"brief": serialize(brief), "task": serialize(task)}
+
+    def list_briefs(self, task_id: str) -> dict[str, Any]:
+        task = self.store.load_task(task_id)
+        briefs = self._briefs_for_task(task.id)
+        return {"briefs": serialize(briefs), "task": serialize(task)}
+
+    def show_brief(self, brief_id: str) -> dict[str, Any]:
+        return {"brief": serialize(self.store.load_planning_brief(brief_id))}
+
+    def setup(
+        self,
+        scope: str,
+        preset: str = "local",
+        workflow_backend: str = "local",
+        task_id: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        brief_dir: str | None = None,
+        reset: bool = False,
+        quick: bool = False,
+        non_interactive: bool = False,
+    ) -> dict[str, Any]:
+        if scope == "runtime":
+            return self._setup_runtime(
+                preset=preset,
+                workflow_backend=workflow_backend,
+                reset=reset,
+                quick=quick,
+                non_interactive=non_interactive,
+            )
+        if scope == "project":
+            return self._setup_project(
+                preset=preset,
+                workflow_backend=workflow_backend,
+                task_id=task_id,
+                title=title,
+                description=description,
+                brief_dir=brief_dir,
+                reset=reset,
+                quick=quick,
+                non_interactive=non_interactive,
+            )
+        raise PatchrailError(f"Unknown setup scope '{scope}'.")
 
     def init_config(self, preset: str = "local", workflow_backend: str = "local") -> dict[str, Any]:
         policy = self.config.init_default(preset=preset, workflow_backend=workflow_backend)
@@ -126,6 +222,94 @@ class PatchrailApp:
         ]
         return {"doctor": payload}
 
+    def _setup_runtime(
+        self,
+        preset: str,
+        workflow_backend: str,
+        reset: bool,
+        quick: bool,
+        non_interactive: bool,
+    ) -> dict[str, Any]:
+        config_initialized = self.config.config_path.exists() and self.config.workflow_path.exists()
+        config_created = reset or not config_initialized
+        if config_created:
+            self.init_config(preset=preset, workflow_backend=workflow_backend)
+        doctor = self.doctor()["doctor"]
+        return {
+            "setup": {
+                "scope": "runtime",
+                "config_created": config_created,
+                "config_initialized": doctor["config_initialized"],
+                "config_path": doctor["config_path"],
+                "workflow_path": doctor["workflow_path"],
+                "workflow_backend": doctor["workflow_backend"],
+                "preflight": doctor["preflight"],
+                "quick": quick,
+                "non_interactive": non_interactive,
+                "next_steps": [
+                    'patchrail setup project --title "First task" --description "Describe the supervised work"',
+                    "patchrail doctor",
+                    "sh scripts/local_smoke_test.sh",
+                ],
+            }
+        }
+
+    def _setup_project(
+        self,
+        preset: str,
+        workflow_backend: str,
+        task_id: str | None,
+        title: str | None,
+        description: str | None,
+        brief_dir: str | None,
+        reset: bool,
+        quick: bool,
+        non_interactive: bool,
+    ) -> dict[str, Any]:
+        runtime_payload = self._setup_runtime(
+            preset=preset,
+            workflow_backend=workflow_backend,
+            reset=reset,
+            quick=quick,
+            non_interactive=non_interactive,
+        )["setup"]
+        if task_id is not None:
+            task = self.store.load_task(task_id)
+        else:
+            if title is None or description is None:
+                raise PatchrailError("Project setup requires --task-id or both --title and --description.")
+            task = Task.from_dict(self.create_task(title=title, description=description)["task"])
+
+        brief_directory = Path(brief_dir).expanduser() if brief_dir is not None else self.store.root / "brief-sources"
+        brief_directory.mkdir(parents=True, exist_ok=True)
+        template_paths: dict[str, str] = {}
+        for kind in BriefKind:
+            template_path = brief_directory / f"{task.id}-{kind.value}.md"
+            template_paths[kind.value] = str(template_path)
+            if not template_path.exists():
+                template_path.write_text(self._brief_template(kind=kind, task=task))
+
+        return {
+            "setup": {
+                "scope": "project",
+                "config_created": runtime_payload["config_created"],
+                "workflow_backend": runtime_payload["workflow_backend"],
+                "task": serialize(task),
+                "briefs": [],
+                "brief_files": template_paths,
+                "quick": quick,
+                "non_interactive": non_interactive,
+                "next_steps": [
+                    f"Edit the generated brief files under {brief_directory}",
+                    f"patchrail brief create --task-id {task.id} --kind future --file {template_paths['future']}",
+                    f"patchrail brief create --task-id {task.id} --kind ontology --file {template_paths['ontology']}",
+                    f"patchrail brief create --task-id {task.id} --kind product --file {template_paths['product']}",
+                    f"patchrail plan --task-id {task.id} --auto",
+                    f"patchrail status --task-id {task.id}",
+                ],
+            }
+        }
+
     def preflight(
         self,
         role_name: str,
@@ -158,6 +342,7 @@ class PatchrailApp:
         task = self.store.load_task(task_id)
         require_state(task, TaskState.CREATED, "create a plan")
         self._validate_plan_inputs(auto=auto, summary=summary, steps=steps)
+        planning_briefs = self._briefs_for_task(task.id)
         resolution = resolve_role_assignment(
             self.config.load_policy(),
             role=Role.PLANNER,
@@ -169,7 +354,11 @@ class PatchrailApp:
         if auto:
             if resolution.selected_candidate is None:
                 raise PatchrailError("No planner candidate was selected.")
-            workflow_result = self._get_workflow_engine().generate_plan(resolution.selected_candidate, task)
+            workflow_result = self._get_workflow_engine().generate_plan(
+                resolution.selected_candidate,
+                task,
+                planning_briefs,
+            )
             summary, steps = workflow_result.summary, workflow_result.steps
             self._append_trace(
                 task.id,
@@ -196,8 +385,13 @@ class PatchrailApp:
             fallback_event=resolution.fallback_event,
             workflow_backend=self._get_workflow_engine().backend_name if workflow_result else None,
             workflow_metadata=workflow_result.metadata if workflow_result else {},
+            planning_briefs=[brief.to_reference() for brief in planning_briefs],
         )
         self.store.save_plan(plan)
+        for brief in planning_briefs:
+            if brief.attached_plan_id != plan.id:
+                brief.attached_plan_id = plan.id
+                self.store.save_planning_brief(brief)
         task.plan_id = plan.id
         transition_task(task, TaskState.PLANNED)
         task.updated_at = utc_now()
@@ -529,6 +723,40 @@ class PatchrailApp:
                 if any(artifact.logical_kind == "runner_trace" for artifact in bundle.artifacts.values())
             ]
         return {"artifact_bundles": serialize(bundles)}
+
+    def _briefs_for_task(self, task_id: str) -> list[PlanningBrief]:
+        briefs = [brief for brief in self.store.list_planning_briefs() if brief.task_id == task_id]
+        return sorted(briefs, key=lambda brief: (_BRIEF_KIND_ORDER[brief.kind], brief.created_at))
+
+    def _brief_kind(self, kind_name: str) -> BriefKind:
+        try:
+            return BriefKind(kind_name)
+        except ValueError as exc:
+            allowed = ", ".join(kind.value for kind in BriefKind)
+            raise PatchrailError(f"Unknown brief kind '{kind_name}'. Expected one of: {allowed}.") from exc
+
+    def _merge_brief_reference(self, existing: list[Any], brief: PlanningBrief) -> list[Any]:
+        return [reference for reference in existing if reference.id != brief.id] + [brief.to_reference()]
+
+    def _brief_template(self, kind: BriefKind, task: Task) -> str:
+        spec = PLANNING_LAYER_BY_KIND[kind.value]
+        lines = [
+            f"# {spec.title}",
+            "",
+            f"Task: {task.id}",
+            f"Title: {task.title}",
+            f"Layer: {spec.layer}",
+            f"Question: {spec.question}",
+            f"Timing: {spec.timing}",
+            "",
+            f"Purpose: {spec.purpose}",
+            "",
+            "Replace this scaffold with the concrete planning boundary before creating the canonical plan.",
+            "",
+        ]
+        for heading in spec.headings:
+            lines.extend([f"## {heading}", "", "- TBD", ""])
+        return "\n".join(lines)
 
     def _append_trace(
         self,

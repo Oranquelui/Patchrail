@@ -5,7 +5,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from patchrail.core.exceptions import PatchrailError
-from patchrail.models.entities import ArtifactBundle, Plan, Run, Task
+from patchrail.models.entities import ArtifactBundle, Plan, PlanningBrief, Run, Task
 from patchrail.models.roles import RoleCandidate
 from patchrail.workflows.base import PlanWorkflowResult, ReviewWorkflowResult, WorkflowEngine
 from patchrail.workflows.local import LocalWorkflowEngine
@@ -17,6 +17,7 @@ _CHECKPOINTER_MODE = "stateless"
 class _PlanState(TypedDict):
     candidate: RoleCandidate
     task: Task
+    briefs: list[PlanningBrief]
     metadata: dict[str, Any]
     node_trace: list[str]
     generated_result: PlanWorkflowResult | None
@@ -43,11 +44,17 @@ class LangGraphWorkflowEngine(WorkflowEngine):
         self._plan_graph = self._build_plan_graph()
         self._review_graph = self._build_review_graph()
 
-    def generate_plan(self, candidate: RoleCandidate, task: Task) -> PlanWorkflowResult:
+    def generate_plan(
+        self,
+        candidate: RoleCandidate,
+        task: Task,
+        briefs: list[PlanningBrief] | None = None,
+    ) -> PlanWorkflowResult:
         state = self._plan_graph.invoke(
             {
                 "candidate": candidate,
                 "task": task,
+                "briefs": briefs or [],
                 "metadata": {},
                 "node_trace": [],
                 "generated_result": None,
@@ -121,12 +128,13 @@ class LangGraphWorkflowEngine(WorkflowEngine):
                 "candidate_name": state["candidate"].name,
                 "provider": state["candidate"].provider.value,
                 "task_id": state["task"].id,
+                "brief_ids": [brief.id for brief in state["briefs"]],
             },
             "node_trace": self._append_trace(state["node_trace"], "collect_plan_context"),
         }
 
     def _generate_plan(self, state: _PlanState) -> dict[str, object]:
-        generated = self._local.generate_plan(state["candidate"], state["task"])
+        generated = self._local.generate_plan(state["candidate"], state["task"], state["briefs"])
         return {
             "generated_result": generated,
             "metadata": {**state["metadata"], **generated.metadata},

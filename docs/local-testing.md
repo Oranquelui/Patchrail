@@ -10,6 +10,7 @@ brew install pipx
 pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
+patchrail setup
 patchrail start
 patchrail start --once
 ```
@@ -20,6 +21,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```
 
 default output は人間向け summary です。machine-readable な JSON が必要な場合は `patchrail --json ...` を使います。`scripts/local_smoke_test.sh` は内部でこの mode を使います。
+`patchrail setup` は first-run 用の導線です。runtime config を作成し、preflight summary と次の具体コマンドを返します。`patchrail setup project --title ... --description ...` は task と `future / ontology / product` brief scaffold を作成します。
 `patchrail start` は TTY では interactive shell に入り、`patchrail start --once` は splash を 1 回だけ描画します。
 
 ## Fastest Path
@@ -27,13 +29,15 @@ default output は人間向け summary です。machine-readable な JSON が必
 ```bash
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
+patchrail setup
+patchrail setup project --title "First task" --description "Describe the supervised work"
 patchrail start
 ```
 `patchrail start` に入った後は `doctor`, `list tasks`, `task create ...`, `status --task-id ...`, `exit` をそのまま打てます。slash shortcut は `/help`, `/doctor`, `/tasks`, `/start`, `/exit` を使えます。
 2. role policy を初期化し、preflight を確認する。
 ```bash
 # local preset
-patchrail config init
+patchrail setup
 patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
 patchrail preflight --role reviewer

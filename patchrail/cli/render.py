@@ -10,10 +10,14 @@ def render_payload(args: Any, payload: dict[str, Any]) -> str:
         return _render_start(payload)
     if args.command == "config" and getattr(args, "config_command", None) == "init":
         return _render_config_init(payload)
+    if args.command == "setup":
+        return _render_setup(payload)
     if args.command == "doctor":
         return _render_doctor(payload)
     if args.command == "task" and getattr(args, "task_command", None) == "create":
         return _render_task_create(payload)
+    if args.command == "brief":
+        return _render_brief(getattr(args, "brief_command", ""), payload)
     if args.command == "plan":
         return _render_plan(payload)
     if args.command == "preflight":
@@ -52,6 +56,55 @@ def _render_config_init(payload: dict[str, Any]) -> str:
             "  sh scripts/local_smoke_test.sh",
         ]
     )
+
+
+def _render_setup(payload: dict[str, Any]) -> str:
+    setup = payload["setup"]
+    lines = [
+        _style("Patchrail Setup", "title"),
+        _style("local-first supervised agent setup", "muted"),
+        "",
+        _panel(
+            "Runtime",
+            [
+                f"Scope: {setup['scope']}",
+                f"Config: {'created' if setup['config_created'] else 'existing'}",
+                f"Workflow backend: {setup['workflow_backend']}",
+            ],
+        ),
+    ]
+    if setup["scope"] == "runtime":
+        preflight = setup.get("preflight") or {}
+        candidate_lines: list[str] = []
+        for role in ("planner", "reviewer", "executor"):
+            item = preflight.get(role)
+            if not item:
+                continue
+            selected = item.get("selected_candidate")
+            if selected is None:
+                candidate_lines.append(f"{role.capitalize()}: no ready candidate")
+            else:
+                candidate_lines.append(
+                    f"{role.capitalize()}: {selected['candidate_name']} "
+                    f"({selected['provider']} {selected['access_mode']})"
+                )
+        if candidate_lines:
+            lines.extend(["", _panel("Checks", candidate_lines)])
+    if setup["scope"] == "project":
+        task = setup["task"]
+        brief_lines = [
+            f"Task: {task['id']}",
+            f"Title: {task['title']}",
+        ]
+        for kind, path in setup["brief_files"].items():
+            brief_lines.append(f"{kind} source: {path}")
+        if not setup["briefs"]:
+            brief_lines.append("Persisted briefs: none yet; edit sources, then run brief create before plan.")
+        for brief in setup["briefs"]:
+            brief_lines.append(f"{brief['kind']}: {brief['id']} -> {setup['brief_files'][brief['kind']]}")
+        lines.extend(["", _panel("Project", brief_lines)])
+    lines.extend(["", _panel("Next", [f"{index}. {step}" for index, step in enumerate(setup["next_steps"], start=1)])])
+    return "\n".join(lines)
 
 
 def _render_start(payload: dict[str, Any]) -> str:
@@ -164,6 +217,40 @@ def _render_task_create(payload: dict[str, Any]) -> str:
     )
 
 
+def _render_brief(brief_command: str, payload: dict[str, Any]) -> str:
+    if brief_command == "create":
+        brief = payload["brief"]
+        task = payload["task"]
+        return "\n".join(
+            [
+                f"Stored {brief['kind']} brief {brief['id']} for task {task['id']}",
+                f"Source: {brief['source_path']}",
+                f"Storage: {brief['storage_path']}",
+                f"SHA256: {brief['sha256']}",
+            ]
+        )
+    if brief_command == "list":
+        briefs = payload["briefs"]
+        lines = [f"Briefs: {len(briefs)}"]
+        for brief in briefs:
+            attached = brief.get("attached_plan_id") or "pending"
+            lines.append(f"  {brief['id']} | {brief['kind']} | plan={attached}")
+        return "\n".join(lines)
+    if brief_command == "show":
+        brief = payload["brief"]
+        return "\n".join(
+            [
+                f"Brief {brief['id']} ({brief['kind']})",
+                f"Task: {brief['task_id']}",
+                f"Source: {brief['source_path']}",
+                f"Storage: {brief['storage_path']}",
+                "",
+                brief["content"].rstrip(),
+            ]
+        ).rstrip()
+    return _render_unknown(payload)
+
+
 def _render_plan(payload: dict[str, Any]) -> str:
     plan = payload["plan"]
     task = payload["task"]
@@ -175,6 +262,10 @@ def _render_plan(payload: dict[str, Any]) -> str:
     ]
     for index, step in enumerate(plan["steps"], start=1):
         lines.append(f"  {index}. {step}")
+    if plan.get("planning_briefs"):
+        lines.append("Planning briefs:")
+        for brief in plan["planning_briefs"]:
+            lines.append(f"  {brief['kind']}: {brief['id']}")
     if plan.get("workflow_backend"):
         lines.append(f"Workflow backend: {plan['workflow_backend']}")
     return "\n".join(lines)
@@ -267,6 +358,11 @@ def _render_status(payload: dict[str, Any]) -> str:
     ]
     if "plan" in payload:
         lines.append(f"Plan: {payload['plan']['id']} | {payload['plan']['summary']}")
+        if payload["plan"].get("planning_briefs"):
+            brief_labels = ", ".join(
+                f"{brief['kind']}:{brief['id']}" for brief in payload["plan"]["planning_briefs"]
+            )
+            lines.append(f"Planning briefs: {brief_labels}")
     if "latest_run" in payload:
         run = payload["latest_run"]
         lines.append(f"Latest run: {run['id']} | exit {run['exit_code']} | {run['status']}")

@@ -3,15 +3,27 @@
 ## System Overview
 Patchrail is a local-first control plane that records supervised coding-agent workflows as explicit state transitions. The MVP is a headless core with a thin CLI wrapper. It accepts a task, stores a plan, resolves role assignments through a provider and access-mode policy, records a run, persists an artifact bundle, captures a review result, and requires an explicit human approval or rejection before completion.
 
-The current MVP proves the canonical workflow record and approval boundary. The next planning phase extends the front of that workflow so operators can define what finished looks like, which concepts are real, and what scope is in-bounds before implementation begins. That phase remains subordinate to the existing canonical state machine rather than replacing it.
+The current MVP proves the canonical workflow record and approval boundary. The first planning layer extends the front of that workflow so operators can define what finished looks like, which concepts are real, and what scope is in-bounds before implementation begins. That layer remains subordinate to the existing canonical state machine rather than replacing it.
+
+Patchrail uses the word "layer" narrowly:
+
+| Layer | Brief / Record | Timing | Purpose |
+| --- | --- | --- | --- |
+| Prediction | `Future Completion Brief` | before implementation | Predict what should be true in the future, including invariants, failure conditions, and non-goals. |
+| Reality boundary | `Ontology Brief` | before implementation | Define what exists, who owns it, and where approval/artifact boundaries sit. |
+| Post-implementation acceptance | `Product Brief` | defined before implementation, checked after implementation | State what must be true for users and operators after the implementation exists. |
+| Execution translation | canonical `Plan` | before run | Convert the three briefs into executable steps and snapshot the brief references immutably. |
+| Post-implementation evidence | Harness / `ArtifactBundle` | after executor run, before review | Capture execution summary, diff summary, stdout/stderr, invocation, runner trace, and artifact metadata for reviewer and human approval. |
+
+So the short answer is: Future is prediction; Product is the after-implementation acceptance layer; Harness is the after-implementation evidence capture layer.
 
 ## Core Modules
-- `patchrail.cli`: `argparse`-based command surface plus a thin render layer for task, config, start, doctor, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands. Human-readable output is the operator default; `--json` preserves machine-readable automation output.
+- `patchrail.cli`: `argparse`-based command surface plus a thin render layer for setup, task, planning brief, config, start, doctor, preflight, plan, run, status, review, approval, fallback approval, list, logs, and artifacts commands. Human-readable output is the operator default; `--json` preserves machine-readable automation output.
 - `patchrail.cli.shell`: a small interactive shell wrapper for `patchrail start` in TTY sessions. It reuses the canonical CLI parser and service layer instead of adding a second state machine.
 - `patchrail.core`: orchestration services, role assignment resolution, preflight logic, ID generation, state transition validation, domain errors, and future hook contracts.
 - `patchrail.workflows`: pluggable auto plan/review backend contract plus the default local backend and an optional LangGraph-backed planner/reviewer scaffold.
-- `patchrail.models`: dataclasses and enums for `Task`, `Plan`, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
-- `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, and artifact lookup.
+- `patchrail.models`: dataclasses and enums for `Task`, `Plan`, plan-scoped planning brief references, `Run`, `RunnerAssignment`, `ReviewResult`, `ApprovalRecord`, `FallbackApprovalRequest`, `PreflightSnapshot`, `ArtifactBundle`, `DecisionTrace`, and `CostMetrics`.
+- `patchrail.storage`: filesystem persistence for JSON records, role-policy config, JSONL ledgers, planning brief companion artifacts, and artifact lookup.
 - `patchrail.runners`: runner interface, shell-backed local harness execution, API-backed executor runners, and Claude-backed subscription executor runners.
 - `patchrail.providers`: minimal HTTP adapters for provider-backed executor calls and workflow backends that need direct provider completion calls.
 - `patchrail.review`: review persistence and review-to-approval boundary handling.
@@ -19,7 +31,7 @@ The current MVP proves the canonical workflow record and approval boundary. The 
 - `patchrail.artifacts`: artifact bundle creation and lookup.
 
 ## Phase 1 Planning Direction
-The next planned layer adds future-anchored planning without creating new top-level canonical records.
+The first planning layer adds future-anchored planning without creating new top-level canonical records.
 
 Planned operator flow:
 1. `machine/runtime onboarding`
@@ -29,14 +41,16 @@ Planned operator flow:
 5. canonical `ReviewResult`
 6. canonical `ApprovalRecord`
 
-Planned planning artifacts:
-- `Future Completion Brief`: the target completed state, invariant constraints, failure conditions, and non-goals
-- `Ontology Brief`: the entities, relations, ownership boundaries, approval boundaries, artifact boundaries, and explicit non-entities
-- `Product Brief`: the user problem, MVP scope, acceptance criteria, and out-of-scope commitments
+Planning artifacts:
+- `Future Completion Brief` / Prediction layer: what should be true in the future, including completed state, invariant constraints, failure conditions, and non-goals
+- `Ontology Brief` / Reality-boundary layer: what exists, who owns it, entity relations, approval boundaries, artifact boundaries, and explicit non-entities
+- `Product Brief` / Post-implementation acceptance layer: the user problem, MVP scope, acceptance criteria, operator evidence to review after implementation, and out-of-scope commitments
 - `Triangulated Plan Summary`: a comparison layer across distinct planning participants before Patchrail stores the canonical plan
 
 Phase 1 constraints:
-- These briefs are plan-scoped companion artifacts or metadata, not new canonical records.
+- The three briefs are stored as plan-scoped companion artifacts, not new canonical lifecycle records.
+- Operators can create, list, and show them through `patchrail brief create|list|show`.
+- Brief content is persisted locally under `.patchrail/briefs/` with a SHA-256 digest. When a plan is created, the plan stores stable `planning_briefs` references to the task's current briefs.
 - The canonical lifecycle remains `Task -> Plan -> Run -> ReviewResult -> ApprovalRecord`.
 - Approval meaning, ledgers, and artifact ownership remain Patchrail-owned.
 - LangGraph may help produce planning candidates, but it does not own the planning ontology, approval semantics, or canonical state transitions.
@@ -74,7 +88,7 @@ Hard rules:
 ## State Model
 - `Task` is the supervisory anchor for a unit of work.
 - `Plan` belongs to a task, must exist before a run can start, and stores the resolved planner assignment plus preflight evidence. Auto-generated plans may also store auxiliary workflow backend metadata, but the canonical plan record remains Patchrail-owned.
-- In the planned Phase 1 layer, a `Plan` may also reference a `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and triangulated planning metadata as companion artifacts. Those supporting documents do not replace the canonical plan record.
+- A `Plan` may also reference a `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and future triangulated planning metadata as companion artifacts. Those supporting documents do not replace the canonical plan record.
 - `Run` records runner assignment, elapsed time, synthetic output, artifact bundle identity, and the resolved executor assignment plus preflight evidence.
 - `ReviewResult` records the reviewer verdict, rationale, and the resolved reviewer assignment plus preflight evidence. Auto-generated reviews may also store auxiliary workflow backend metadata, but approval meaning remains outside the backend.
 - `ApprovalRecord` records the human decision and rationale after review.
@@ -134,6 +148,7 @@ Patchrail is moving toward a two-pass onboarding model.
 - access-mode selection across `api` and `subscription`
 - workflow backend selection across `local` and optional `langgraph`
 - readiness verification through `doctor` and role preflight
+- first-run setup through `patchrail setup`, which bootstraps config, runs the same preflight summary as `doctor`, and prints concrete next commands
 
 `project/planning onboarding` configures what this project is trying to finish:
 - create the task anchor
@@ -141,6 +156,7 @@ Patchrail is moving toward a two-pass onboarding model.
 - define the `Ontology Brief`
 - define the `Product Brief`
 - generate a canonical plan from those constraints
+- first-run project setup through `patchrail setup project`, which can create the task anchor and write editable local brief scaffolds before explicit `brief create` and `plan`
 
 Phase 1 treats the three-provider setup as recommended rather than universally required. If one or more providers are unavailable, Patchrail should remain usable while surfacing that triangulated planning is degraded.
 
@@ -191,6 +207,7 @@ Filesystem layout:
 - `.patchrail/config/role-policy.json`
 - `.patchrail/config/workflow-backend.json`
 - `.patchrail/tasks/<task_id>.json`
+- `.patchrail/briefs/<brief_id>.json`
 - `.patchrail/plans/<plan_id>.json`
 - `.patchrail/runs/<run_id>.json`
 - `.patchrail/reviews/<review_id>.json`
@@ -213,6 +230,8 @@ Filesystem layout:
 
 Read-side navigation:
 - `patchrail list tasks`
+- `patchrail brief list --task-id <task_id>`
+- `patchrail brief show --brief-id <brief_id>`
 - `patchrail list plans [--task-id <task_id>]`
 - `patchrail list runs [--task-id <task_id>]`
 - `patchrail list reviews [--task-id <task_id>]`
@@ -223,18 +242,19 @@ Read-side navigation:
 - `patchrail status --task-id <task_id>` also surfaces `latest_artifact_bundle` for the current run when one exists
 
 ## Artifact And Approval Flow
-1. `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
+1. `setup` or `config init [--preset local|real]` creates the local role-policy document used for ontology-aware testing.
 2. `task create` stores a new task and appends a decision trace.
-3. `plan` resolves the planner candidate, optionally auto-generates plan content through the selected workflow backend, stores the plan with preflight evidence plus any auxiliary workflow metadata, updates the task to `planned`, and appends decision traces.
-4. Every `plan`, `run`, and `review` resolution attempt first writes a standalone `PreflightSnapshot`.
-5. If role resolution hits a blocked fallback, Patchrail stores a `FallbackApprovalRequest`, appends trace and fallback-approval ledger entries, and stops the phase without mutating the task lifecycle.
-6. `approve-fallback` or `reject-fallback` records the human decision for that deviation request.
-7. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
+3. `setup project` can create a task and write editable local brief scaffolds. After the operator replaces placeholder content, `brief create` stores a `future`, `ontology`, or `product` companion artifact for that task, records its digest, and appends a decision trace without changing task lifecycle state.
+4. `plan` resolves the planner candidate, optionally auto-generates plan content through the selected workflow backend, stores the plan with preflight evidence, planning brief references, plus any auxiliary workflow metadata, updates the task to `planned`, and appends decision traces.
+5. Every `plan`, `run`, and `review` resolution attempt first writes a standalone `PreflightSnapshot`.
+6. If role resolution hits a blocked fallback, Patchrail stores a `FallbackApprovalRequest`, appends trace and fallback-approval ledger entries, and stops the phase without mutating the task lifecycle.
+7. `approve-fallback` or `reject-fallback` records the human decision for that deviation request.
+8. `run` resolves the executor candidate, creates an isolated workspace, stores runner assignment metadata inside the run record, writes invocation plus stdout/stderr artifact files, updates the task to `review_pending`, and appends decision traces.
    - Artifact bundles now include manifest-style metadata per file, including logical kind, media type, collection status, digest, and byte size.
    - Runner adapters may also return an optional structured trace, which Patchrail persists as another artifact without giving the runner ownership of the canonical run record.
    - Read-side lookup stays Patchrail-owned: the latest bundle is exposed through `status`, and historical bundle queries stay under the CLI list surface.
-8. `review` resolves the reviewer candidate, optionally auto-generates review content through the selected workflow backend, stores the review result with rationale and preflight evidence plus any auxiliary workflow metadata, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
-9. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
+9. `review` resolves the reviewer candidate, optionally auto-generates review content through the selected workflow backend, stores the review result with rationale and preflight evidence plus any auxiliary workflow metadata, updates the task to `awaiting_approval`, and appends a decision trace with rationale.
+10. `approve` or `reject` stores an approval record, appends both decision and approval ledger entries, and moves the task to its final state.
 
 ## Deferred Hook Contract
 Future infra-ops support is represented as a hook seam, not an automation system:

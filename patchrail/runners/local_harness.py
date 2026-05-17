@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+from patchrail.core.layers import HARNESS_CONTRACT
+
 
 def _require_env(name: str) -> str:
     value = os.getenv(name)
@@ -42,6 +44,7 @@ def main() -> int:
         },
         "runner_trace": {
             "schema_version": "patchrail.runner_trace.v1",
+            "harness_contract": HARNESS_CONTRACT.to_dict(),
             "runner_name": runner_name,
             "run_id": run_id,
             "events": [

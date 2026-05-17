@@ -55,6 +55,7 @@ install_cmd="(cd $safe_dir && pipx install --python $python_bin --editable $repo
 uninstall_cmd="(cd $safe_dir && pipx uninstall patchrail)"
 inject_cmd="pipx inject patchrail langgraph"
 verify_cmd="patchrail --help"
+setup_cmd="patchrail setup"
 
 if [ "$dry_run" -eq 1 ]; then
   printf '%s\n' "$uninstall_cmd"
@@ -63,6 +64,7 @@ if [ "$dry_run" -eq 1 ]; then
     printf '%s\n' "(cd $safe_dir && $inject_cmd)"
   fi
   printf '%s\n' "$verify_cmd"
+  printf '%s\n' "$setup_cmd"
   exit 0
 fi
 
@@ -94,3 +96,4 @@ fi
 
 echo "Patchrail is installed. Run:"
 echo "  patchrail --help"
+echo "  patchrail setup"

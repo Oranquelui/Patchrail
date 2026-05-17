@@ -4,7 +4,7 @@
 Prove Patchrail’s thesis with the narrowest possible supervised workflow: a task can be created, planned, resolved through role-aware policy and preflight, executed locally, reviewed, explicitly approved or rejected, and safely resumed from local disk alone.
 
 ## In Scope
-- CLI commands for config bootstrap, preflight inspection, task creation, planning, execution, status, review, approval, rejection, logs, and artifact lookup.
+- CLI commands for setup bootstrap, config bootstrap, preflight inspection, task creation, planning brief scaffolding, planning, execution, status, review, approval, rejection, logs, and artifact lookup.
 - A CLI onboarding shell via `patchrail start`, with `patchrail start --once` as the non-interactive splash path.
 - Filesystem persistence under `.patchrail/` or `PATCHRAIL_HOME`.
 - CLI-visible workflow backend selection persisted under local config, with `local` as default and `langgraph` as an optional backend.
@@ -20,6 +20,8 @@ Prove Patchrail’s thesis with the narrowest possible supervised workflow: a ta
 
 ## Acceptance Criteria
 - `patchrail config init` creates a local role-policy document and persists the selected workflow backend.
+- `patchrail setup` bootstraps runtime config, reports preflight status, and returns concrete next commands.
+- `patchrail setup project` creates or reuses a task and writes editable local Future Completion, Ontology, and Product brief scaffolds; operators persist edited brief content with `patchrail brief create` before plan creation.
 - `patchrail start` can bootstrap config and keep an operator in a TTY shell without introducing a second canonical state model.
 - `patchrail preflight` reports role candidate readiness from local state and environment only.
 - `patchrail task create` creates a task and persists it locally.

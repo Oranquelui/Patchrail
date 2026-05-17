@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from patchrail.models.entities import ArtifactBundle, Plan, ReviewVerdict, Run, Task
+from patchrail.models.entities import ArtifactBundle, Plan, PlanningBrief, ReviewVerdict, Run, Task
 from patchrail.models.roles import RoleCandidate
 
 
@@ -26,7 +26,12 @@ class WorkflowEngine(ABC):
     backend_name: str
 
     @abstractmethod
-    def generate_plan(self, candidate: RoleCandidate, task: Task) -> PlanWorkflowResult:
+    def generate_plan(
+        self,
+        candidate: RoleCandidate,
+        task: Task,
+        briefs: list[PlanningBrief] | None = None,
+    ) -> PlanWorkflowResult:
         raise NotImplementedError
 
     @abstractmethod

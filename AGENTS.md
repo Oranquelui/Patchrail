@@ -1,5 +1,13 @@
 # AGENTS
 
+## Browser MCP Safety Policy
+- Browser-control MCPs must not be registered globally by default.
+- Do not use `--autoConnect` with Chrome DevTools MCP.
+- Enable Chrome DevTools or Playwright MCP only temporarily for a specific browser-debugging task.
+- After browser debugging, remove the temporary MCP registration and stop spawned `chrome-devtools-mcp`, Playwright MCP, and automated Chrome profile processes.
+- Do not auto-open local dashboards or file URLs from startup configuration.
+- Do not render local repository files as `file://` URLs in assistant output or persistent project configuration; use absolute markdown file links or plain absolute paths.
+
 ## Thesis
 Patchrail is a local-first, supervised coding-agent control plane for serious users of agentic coding workflows. It exists to make planning, execution, review, approval, and continuation auditable and reproducible without drifting into a generic assistant platform.
 

@@ -48,6 +48,12 @@ class PreflightPhase(StrEnum):
     REVIEW = "review"
 
 
+class BriefKind(StrEnum):
+    FUTURE = "future"
+    ONTOLOGY = "ontology"
+    PRODUCT = "product"
+
+
 @dataclass(slots=True)
 class CostMetrics:
     prompt_tokens: int
@@ -126,6 +132,64 @@ class Task:
 
 
 @dataclass(slots=True)
+class PlanningBriefReference:
+    id: str
+    kind: BriefKind
+    source_path: str
+    storage_path: str
+    sha256: str
+    created_at: str
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PlanningBriefReference:
+        return cls(
+            id=payload["id"],
+            kind=BriefKind(payload["kind"]),
+            source_path=payload["source_path"],
+            storage_path=payload["storage_path"],
+            sha256=payload["sha256"],
+            created_at=payload["created_at"],
+        )
+
+
+@dataclass(slots=True)
+class PlanningBrief:
+    id: str
+    task_id: str
+    kind: BriefKind
+    source_path: str
+    storage_path: str
+    content: str
+    sha256: str
+    created_at: str
+    attached_plan_id: str | None = None
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PlanningBrief:
+        return cls(
+            id=payload["id"],
+            task_id=payload["task_id"],
+            kind=BriefKind(payload["kind"]),
+            source_path=payload["source_path"],
+            storage_path=payload["storage_path"],
+            content=payload["content"],
+            sha256=payload["sha256"],
+            created_at=payload["created_at"],
+            attached_plan_id=payload.get("attached_plan_id"),
+        )
+
+    def to_reference(self) -> PlanningBriefReference:
+        return PlanningBriefReference(
+            id=self.id,
+            kind=self.kind,
+            source_path=self.source_path,
+            storage_path=self.storage_path,
+            sha256=self.sha256,
+            created_at=self.created_at,
+        )
+
+
+@dataclass(slots=True)
 class Plan:
     id: str
     task_id: str
@@ -138,6 +202,7 @@ class Plan:
     fallback_event: FallbackEvent | None = None
     workflow_backend: str | None = None
     workflow_metadata: dict[str, Any] = field(default_factory=dict)
+    planning_briefs: list[PlanningBriefReference] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> Plan:
@@ -155,6 +220,10 @@ class Plan:
             fallback_event=FallbackEvent.from_dict(payload["fallback_event"]) if payload.get("fallback_event") else None,
             workflow_backend=payload.get("workflow_backend"),
             workflow_metadata=dict(payload.get("workflow_metadata", {})),
+            planning_briefs=[
+                PlanningBriefReference.from_dict(item)
+                for item in payload.get("planning_briefs", [])
+            ],
         )
 
 

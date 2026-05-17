@@ -58,6 +58,117 @@ def test_config_init_defaults_to_human_readable_output(
     assert not stdout.lstrip().startswith("{")
 
 
+def test_setup_runtime_bootstraps_config_and_reports_setup_next_steps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, payload = run_cli(["setup"], capsys)
+
+    assert exit_code == 0
+    setup = payload["setup"]
+    assert setup["scope"] == "runtime"
+    assert setup["config_created"] is True
+    assert setup["workflow_backend"] == "local"
+    assert setup["preflight"]["planner"]["selected_candidate"]["candidate_name"] == "claude_subscription_planner"
+    assert setup["next_steps"] == [
+        'patchrail setup project --title "First task" --description "Describe the supervised work"',
+        "patchrail doctor",
+        "sh scripts/local_smoke_test.sh",
+    ]
+
+
+def test_setup_project_creates_editable_brief_templates_without_persisting_placeholders(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+    brief_dir = tmp_path / "planning-briefs"
+
+    exit_code, payload = run_cli(
+        [
+            "setup",
+            "project",
+            "--title",
+            "Client rollout",
+            "--description",
+            "Introduce supervised coding agents",
+            "--brief-dir",
+            str(brief_dir),
+        ],
+        capsys,
+    )
+
+    assert exit_code == 0
+    setup = payload["setup"]
+    task_id = setup["task"]["id"]
+    assert setup["scope"] == "project"
+    assert setup["task"]["title"] == "Client rollout"
+    assert setup["briefs"] == []
+    assert setup["next_steps"] == [
+        f"Edit the generated brief files under {brief_dir}",
+        f"patchrail brief create --task-id {task_id} --kind future --file {brief_dir / f'{task_id}-future.md'}",
+        f"patchrail brief create --task-id {task_id} --kind ontology --file {brief_dir / f'{task_id}-ontology.md'}",
+        f"patchrail brief create --task-id {task_id} --kind product --file {brief_dir / f'{task_id}-product.md'}",
+        f"patchrail plan --task-id {task_id} --auto",
+        f"patchrail status --task-id {task_id}",
+    ]
+
+    for kind in ("future", "ontology", "product"):
+        template_path = brief_dir / f"{task_id}-{kind}.md"
+        assert template_path.exists()
+        assert "Replace this scaffold" in template_path.read_text()
+
+    exit_code, brief_list = run_cli(["brief", "list", "--task-id", task_id], capsys)
+    assert exit_code == 0
+    assert brief_list["briefs"] == []
+
+
+def test_setup_project_defaults_brief_templates_under_patchrail_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    patchrail_home = tmp_path / ".patchrail"
+    monkeypatch.setenv("PATCHRAIL_HOME", str(patchrail_home))
+
+    exit_code, payload = run_cli(
+        [
+            "setup",
+            "project",
+            "--title",
+            "Client rollout",
+            "--description",
+            "Introduce supervised coding agents",
+        ],
+        capsys,
+    )
+
+    assert exit_code == 0
+    task_id = payload["setup"]["task"]["id"]
+    for kind, path in payload["setup"]["brief_files"].items():
+        template_path = Path(path)
+        assert template_path == patchrail_home / "brief-sources" / f"{task_id}-{kind}.md"
+        assert template_path.exists()
+
+
+def test_setup_project_rejects_missing_task_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code = main(["setup", "project"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Project setup requires --task-id or both --title and --description" in captured.err
+
+
 def test_start_bootstraps_default_config_in_json_mode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -373,6 +484,183 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     approval_entries = (storage_root / "ledgers" / "approval-ledger.jsonl").read_text().strip().splitlines()
     assert len(trace_entries) >= 5
     assert len(approval_entries) == 1
+
+
+def test_brief_create_list_show_and_plan_reference_preserve_existing_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, _ = run_cli(["config", "init"], capsys)
+    assert exit_code == 0
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Briefed planning", "--description", "Plan from explicit boundaries"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    brief_file = tmp_path / "future.md"
+    brief_file.write_text(
+        "# Future Completion Brief\n\n"
+        "Finished means the CLI can store planning briefs before execution.\n\n"
+        "Invariant: Patchrail owns the canonical lifecycle.\n"
+    )
+
+    exit_code, brief_created = run_cli(
+        ["brief", "create", "--task-id", task_id, "--kind", "future", "--file", str(brief_file)],
+        capsys,
+    )
+    assert exit_code == 0
+    brief_id = brief_created["brief"]["id"]
+    assert brief_created["brief"]["task_id"] == task_id
+    assert brief_created["brief"]["kind"] == "future"
+    assert "canonical lifecycle" in brief_created["brief"]["content"]
+    assert Path(brief_created["brief"]["storage_path"]).exists()
+
+    exit_code, brief_list = run_cli(["brief", "list", "--task-id", task_id], capsys)
+    assert exit_code == 0
+    assert [brief["id"] for brief in brief_list["briefs"]] == [brief_id]
+
+    exit_code, brief_shown = run_cli(["brief", "show", "--brief-id", brief_id], capsys)
+    assert exit_code == 0
+    assert brief_shown["brief"]["id"] == brief_id
+    assert "Finished means" in brief_shown["brief"]["content"]
+
+    exit_code, planned = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Use the brief", "--step", "Read the stored brief"],
+        capsys,
+    )
+    assert exit_code == 0
+    plan_id = planned["plan"]["id"]
+    assert planned["plan"]["planning_briefs"] == [
+        {
+            "id": brief_id,
+            "kind": "future",
+            "source_path": str(brief_file),
+            "storage_path": brief_created["brief"]["storage_path"],
+            "sha256": brief_created["brief"]["sha256"],
+            "created_at": brief_created["brief"]["created_at"],
+        }
+    ]
+
+    exit_code, status_payload = run_cli(["status", "--task-id", task_id], capsys)
+    assert exit_code == 0
+    assert status_payload["plan"]["id"] == plan_id
+    assert status_payload["plan"]["planning_briefs"][0]["id"] == brief_id
+
+    exit_code, executed = run_cli(["run", "--task-id", task_id, "--runner", "claude_code"], capsys)
+    assert exit_code == 0
+    run_id = executed["run"]["id"]
+    workspace_plan = json.loads((Path(executed["run"]["workspace_path"]) / "plan.json").read_text())
+    assert workspace_plan["planning_briefs"][0]["id"] == brief_id
+
+    exit_code, logs_payload = run_cli(["logs", "--run-id", run_id], capsys)
+    assert exit_code == 0
+    assert "local harness stdout" in logs_payload["stdout"]
+
+
+def test_brief_create_rejects_duplicate_pending_kind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Single future", "--description", "Keep one active brief per kind"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+    first_file = tmp_path / "future-1.md"
+    second_file = tmp_path / "future-2.md"
+    first_file.write_text("# Future One\n")
+    second_file.write_text("# Future Two\n")
+
+    exit_code, _ = run_cli(["brief", "create", "--task-id", task_id, "--kind", "future", "--file", str(first_file)], capsys)
+    assert exit_code == 0
+
+    exit_code = main(["brief", "create", "--task-id", task_id, "--kind", "future", "--file", str(second_file)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "A future brief already exists" in captured.err
+
+
+def test_brief_create_rejects_changes_after_plan_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Frozen plan", "--description", "Keep plan brief references immutable"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+
+    exit_code, planned = run_cli(
+        ["plan", "--task-id", task_id, "--summary", "Plan without briefs", "--step", "Do the work"],
+        capsys,
+    )
+    assert exit_code == 0
+    assert planned["plan"]["planning_briefs"] == []
+
+    brief_file = tmp_path / "late-future.md"
+    brief_file.write_text("# Late Future Brief\n")
+
+    exit_code = main(["brief", "create", "--task-id", task_id, "--kind", "future", "--file", str(brief_file)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Briefs must be created before the canonical plan" in captured.err
+
+
+def test_brief_create_rejects_invalid_kind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Invalid kind", "--description", "Reject unknown brief kinds"],
+        capsys,
+    )
+    assert exit_code == 0
+    brief_file = tmp_path / "brief.md"
+    brief_file.write_text("# Brief\n")
+
+    exit_code = main(
+        ["brief", "create", "--task-id", created["task"]["id"], "--kind", "strategy", "--file", str(brief_file)]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Unknown brief kind" in captured.err
+    assert "future" in captured.err
+
+
+def test_brief_create_rejects_missing_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+    brief_file = tmp_path / "future.md"
+    brief_file.write_text("# Future Completion Brief\n")
+
+    exit_code = main(["brief", "create", "--task-id", "task_missing", "--kind", "future", "--file", str(brief_file)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "task_missing" in captured.err
 
 
 def test_cli_rejects_invalid_state_transitions(
@@ -810,7 +1098,7 @@ def test_plan_auto_can_use_subscription_planner_path(
     class FakeWorkflowEngine:
         backend_name = "fake-workflow"
 
-        def generate_plan(self, candidate, task):  # noqa: ANN001
+        def generate_plan(self, candidate, task, briefs=None):  # noqa: ANN001
             return type(
                 "PlanWorkflowResult",
                 (),
@@ -940,7 +1228,7 @@ def test_auto_plan_and_review_use_workflow_engine_contract(
     class FakeWorkflowEngine:
         backend_name = "fake-workflow"
 
-        def generate_plan(self, candidate, task):  # noqa: ANN001
+        def generate_plan(self, candidate, task, briefs=None):  # noqa: ANN001
             return type(
                 "PlanWorkflowResult",
                 (),
@@ -1040,7 +1328,7 @@ def test_config_init_can_persist_langgraph_workflow_backend_selection(
     class FakeLangGraphWorkflowEngine:
         backend_name = "langgraph"
 
-        def generate_plan(self, candidate, task):  # noqa: ANN001
+        def generate_plan(self, candidate, task, briefs=None):  # noqa: ANN001
             return type(
                 "PlanWorkflowResult",
                 (),
@@ -1086,7 +1374,7 @@ def test_env_workflow_backend_overrides_persisted_config_selection(
     class FakeLangGraphWorkflowEngine:
         backend_name = "langgraph"
 
-        def generate_plan(self, candidate, task):  # noqa: ANN001
+        def generate_plan(self, candidate, task, briefs=None):  # noqa: ANN001
             return type(
                 "PlanWorkflowResult",
                 (),

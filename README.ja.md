@@ -4,6 +4,33 @@ Patchrail は、ローカルファーストで supervised な coding-agent contr
 
 英語版の公開 README は [README.md](README.md) にあります。
 
+## 3分で見せるポイント
+
+Patchrail は、顧客・クライアントのリポジトリに AI coding agent を導入する際の安全境界を示すためのローカルファーストな control plane です。
+
+1. 監督対象の task を作る。
+2. 実装前に future / ontology / product brief を添付する。
+3. それらの brief を参照する canonical plan を保存する。
+4. 明示的な runner assignment のもとで executor を実行する。
+5. final approval の前に run artifacts をレビューする。
+6. human approval decision と ledger をローカルに残す。
+
+目的は agent を最初から自律実行させることではありません。人間の意図、agent実行、レビュー証跡、最終承認の受け渡しを、あとからディスク上で確認できるようにすることです。
+
+Layer構造は次の意味に固定しています。
+
+| Layer | 対応物 | タイミング | 目的 |
+| --- | --- | --- | --- |
+| Prediction | Future Completion Brief | 実装前 | 未来に何が成立しているべきかを予測する。 |
+| Reality boundary | Ontology Brief | 実装前 | 何が存在し、誰が所有し、どこに承認・artifact境界があるかを定義する。 |
+| Post-implementation acceptance | Product Brief | 実装前に定義し、実装後に確認 | 実装後にユーザー/運用者にとって何が成立しているべきかを定義する。 |
+| Execution translation | Plan | run前 | 上3つを実行手順に変換し、brief参照をimmutableにsnapshotする。 |
+| Post-implementation evidence | Harness / ArtifactBundle | executor実行後、review前 | 実装後の証跡として execution summary, diff, stdout/stderr, invocation, runner trace, artifact metadata を捕獲する。 |
+
+短く言うと、Future は予測、Product は実装後の成立条件、Harness は実装後の証跡捕獲です。
+
+公開向けの説明例は [Supervised Agent Rollout](docs/case-studies/supervised-agent-rollout.md) にあります。
+
 ## Install CLI
 
 ```bash
@@ -12,6 +39,7 @@ brew install pipx
 pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail --help
+patchrail setup
 patchrail start
 
 # optional workflow backend
@@ -20,7 +48,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 
 `patchrail` command 自体は package entrypoint として定義済みで、`scripts/install_cli.sh` はそれを `pipx` 経由で PATH に載せるだけです。`python3` が 3.12 未満の環境では、`--python "$(command -v python3.13)"` のように明示指定します。
 
-CLI は default で人間向けの要約表示を返します。script や automation で構造化出力が必要な場合だけ `patchrail --json ...` を使います。`patchrail start` は TTY では interactive shell を起動し、`patchrail start --once` はホーム画面だけを描画して終了します。
+CLI は default で人間向けの要約表示を返します。script や automation で構造化出力が必要な場合だけ `patchrail --json ...` を使います。`patchrail setup` は first-run 用の導線で、runtime config 作成、preflight summary、次の具体コマンドを返します。`patchrail setup project --title ... --description ...` は task と編集用の `future / ontology / product` brief scaffold を作成します。scaffoldを編集した後、`patchrail brief create ...` で明示的に永続化してから `patchrail plan` を作成します。`patchrail start` は TTY では interactive shell を起動し、`patchrail start --once` はホーム画面だけを描画して終了します。
 
 ## Quickstart
 
@@ -28,6 +56,12 @@ CLI は default で人間向けの要約表示を返します。script や autom
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 # deterministic local flow
+patchrail setup
+patchrail setup project --title "First task" --description "Describe the supervised work"
+# edit the generated future/ontology/product files, then persist each edited brief
+patchrail brief create --task-id <task_id> --kind future --file <future_brief_file>
+patchrail brief create --task-id <task_id> --kind ontology --file <ontology_brief_file>
+patchrail brief create --task-id <task_id> --kind product --file <product_brief_file>
 patchrail start
 patchrail start --once
 patchrail config init --workflow-backend langgraph

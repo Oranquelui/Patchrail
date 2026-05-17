@@ -117,7 +117,11 @@ def _shell_help() -> str:
             "  start, /start        Redraw the home screen once",
             "  list tasks, /tasks   List stored tasks",
             "Examples:",
+            "  setup",
+            '  setup project --title "First task" --description "Describe the work"',
             '  task create --title "First task" --description "Describe the work"',
+            "  brief create --task-id <task_id> --kind future --file future.md",
+            "  brief list --task-id <task_id>",
             "  plan --task-id <task_id> --auto",
             "  status --task-id <task_id>",
         ]

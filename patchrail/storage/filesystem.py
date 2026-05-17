@@ -12,6 +12,7 @@ from patchrail.models.entities import (
     DecisionTrace,
     FallbackApprovalRequest,
     Plan,
+    PlanningBrief,
     PreflightSnapshot,
     ReviewResult,
     Run,
@@ -35,6 +36,7 @@ class FilesystemStore:
         for relative in (
             "tasks",
             "plans",
+            "briefs",
             "runs",
             "reviews",
             "approvals",
@@ -63,6 +65,18 @@ class FilesystemStore:
 
     def list_plans(self) -> list[Plan]:
         return self._list_records(self.root / "plans", Plan.from_dict, "created_at")
+
+    def save_planning_brief(self, brief: PlanningBrief) -> None:
+        self._write_json(self.brief_path(brief.id), serialize(brief))
+
+    def load_planning_brief(self, brief_id: str) -> PlanningBrief:
+        return PlanningBrief.from_dict(self._read_json(self.brief_path(brief_id)))
+
+    def list_planning_briefs(self) -> list[PlanningBrief]:
+        return self._list_records(self.root / "briefs", PlanningBrief.from_dict, "created_at")
+
+    def brief_path(self, brief_id: str) -> Path:
+        return self.root / "briefs" / f"{brief_id}.json"
 
     def save_run(self, run: Run) -> None:
         self._write_json(self.root / "runs" / f"{run.id}.json", serialize(run))

@@ -22,11 +22,34 @@ def build_parser() -> argparse.ArgumentParser:
     task_create.add_argument("--title", required=True)
     task_create.add_argument("--description", required=True)
 
+    brief_parser = subparsers.add_parser("brief")
+    brief_subparsers = brief_parser.add_subparsers(dest="brief_command", required=True)
+    brief_create = brief_subparsers.add_parser("create")
+    brief_create.add_argument("--task-id", required=True)
+    brief_create.add_argument("--kind", required=True)
+    brief_create.add_argument("--file", required=True)
+    brief_list = brief_subparsers.add_parser("list")
+    brief_list.add_argument("--task-id", required=True)
+    brief_show = brief_subparsers.add_parser("show")
+    brief_show.add_argument("--brief-id", required=True)
+
     config_parser = subparsers.add_parser("config")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
     config_init = config_subparsers.add_parser("init")
     config_init.add_argument("--preset", choices=["local", "real"], default="local")
     config_init.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
+
+    setup_parser = subparsers.add_parser("setup")
+    setup_parser.add_argument("setup_scope", nargs="?", choices=["runtime", "project"], default="runtime")
+    setup_parser.add_argument("--preset", choices=["local", "real"], default="local")
+    setup_parser.add_argument("--workflow-backend", choices=["local", "langgraph"], default="local")
+    setup_parser.add_argument("--task-id")
+    setup_parser.add_argument("--title")
+    setup_parser.add_argument("--description")
+    setup_parser.add_argument("--brief-dir")
+    setup_parser.add_argument("--quick", action="store_true")
+    setup_parser.add_argument("--non-interactive", action="store_true")
+    setup_parser.add_argument("--reset", action="store_true")
 
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--preset", choices=["local", "real"], default="local")
@@ -115,8 +138,27 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
 
     if args.command == "task" and args.task_command == "create":
         return app.create_task(title=args.title, description=args.description)
+    if args.command == "brief" and args.brief_command == "create":
+        return app.create_brief(task_id=args.task_id, kind_name=args.kind, file_path=args.file)
+    if args.command == "brief" and args.brief_command == "list":
+        return app.list_briefs(task_id=args.task_id)
+    if args.command == "brief" and args.brief_command == "show":
+        return app.show_brief(brief_id=args.brief_id)
     if args.command == "config" and args.config_command == "init":
         return app.init_config(preset=args.preset, workflow_backend=args.workflow_backend)
+    if args.command == "setup":
+        return app.setup(
+            scope=args.setup_scope,
+            preset=args.preset,
+            workflow_backend=args.workflow_backend,
+            task_id=args.task_id,
+            title=args.title,
+            description=args.description,
+            brief_dir=args.brief_dir,
+            reset=args.reset,
+            quick=args.quick,
+            non_interactive=args.non_interactive,
+        )
     if args.command == "start":
         return app.start(preset=args.preset, workflow_backend=args.workflow_backend)
     if args.command == "doctor":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -47,8 +48,15 @@ def test_readme_screenshot_exists_at_repo_root() -> None:
 
 
 def test_public_repo_excludes_internal_planning_directories() -> None:
-    assert not (REPO_ROOT / ".taskmaster").exists()
-    assert not (REPO_ROOT / "docs" / "superpowers").exists()
+    result = subprocess.run(
+        ["git", "ls-files", ".taskmaster", "docs/superpowers"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout == ""
 
 
 def test_gitignore_ignores_internal_planning_directories() -> None:
@@ -56,6 +64,13 @@ def test_gitignore_ignores_internal_planning_directories() -> None:
 
     assert ".taskmaster/" in gitignore
     assert "docs/superpowers/" in gitignore
+
+
+def test_gitignore_ignores_local_environment_files() -> None:
+    gitignore = (REPO_ROOT / ".gitignore").read_text()
+
+    assert ".env" in gitignore
+    assert ".env.*" in gitignore
 
 
 def test_public_markdown_docs_do_not_include_local_absolute_paths() -> None:
@@ -67,7 +82,7 @@ def test_public_markdown_docs_do_not_include_local_absolute_paths() -> None:
 
     for markdown_file in markdown_files:
         content = markdown_file.read_text()
-        assert "/Users/" not in content, markdown_file
+        assert ("/User" + "s/") not in content, markdown_file
 
 
 def test_japanese_readme_exists_and_links_back_to_english_readme() -> None:

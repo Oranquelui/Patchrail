@@ -25,6 +25,7 @@ def test_install_script_dry_run_prints_base_pipx_install_command() -> None:
     assert "pipx uninstall patchrail" in completed.stdout
     assert f"pipx install --python python3.13 --editable {REPO_ROOT}" in completed.stdout
     assert "patchrail --help" in completed.stdout
+    assert "patchrail setup" in completed.stdout
 
 
 def test_install_script_dry_run_prints_langgraph_injection_command() -> None:

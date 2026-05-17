@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from patchrail.core.exceptions import PatchrailError
-from patchrail.models.entities import ArtifactBundle, Plan, ReviewVerdict, Run, Task
+from patchrail.models.entities import ArtifactBundle, Plan, PlanningBrief, ReviewVerdict, Run, Task
 from patchrail.models.roles import AccessMode, Provider, RoleCandidate
 from patchrail.providers.http import post_json
 from patchrail.workflows.base import PlanWorkflowResult, ReviewWorkflowResult, WorkflowEngine
@@ -15,12 +15,20 @@ from patchrail.workflows.base import PlanWorkflowResult, ReviewWorkflowResult, W
 class LocalWorkflowEngine(WorkflowEngine):
     backend_name = "local"
 
-    def generate_plan(self, candidate: RoleCandidate, task: Task) -> PlanWorkflowResult:
-        summary, steps = _generate_plan_content(candidate, task)
+    def generate_plan(
+        self,
+        candidate: RoleCandidate,
+        task: Task,
+        briefs: list[PlanningBrief] | None = None,
+    ) -> PlanWorkflowResult:
+        summary, steps = _generate_plan_content(candidate, task, briefs or [])
         return PlanWorkflowResult(
             summary=summary,
             steps=steps,
-            metadata={"generation_mode": _generation_mode(candidate)},
+            metadata={
+                "generation_mode": _generation_mode(candidate),
+                "brief_ids": [brief.id for brief in briefs or []],
+            },
         )
 
     def generate_review(
@@ -43,11 +51,11 @@ def _generation_mode(candidate: RoleCandidate) -> str:
     return "simulation" if candidate.simulation else "live_provider"
 
 
-def _generate_plan_content(candidate: RoleCandidate, task: Task) -> tuple[str, list[str]]:
+def _generate_plan_content(candidate: RoleCandidate, task: Task, briefs: list[PlanningBrief]) -> tuple[str, list[str]]:
     if candidate.simulation:
         return _simulated_plan(task)
 
-    payload = _generate_payload(candidate, _planning_prompt(task), role_label="planner")
+    payload = _generate_payload(candidate, _planning_prompt(task, briefs), role_label="planner")
     summary = payload.get("summary")
     steps = payload.get("steps")
     if not isinstance(summary, str) or not summary.strip():
@@ -130,7 +138,13 @@ def _generate_text(
     )
 
 
-def _planning_prompt(task: Task) -> str:
+def _planning_prompt(task: Task, briefs: list[PlanningBrief]) -> str:
+    brief_context = ""
+    if briefs:
+        brief_context = "\nPlanning Briefs:\n" + "\n\n".join(
+            f"[{brief.kind.value}] {brief.id}\n{brief.content.strip()}"
+            for brief in briefs
+        )
     return (
         "You are the planner inside Patchrail, a supervised local-first coding-agent control plane. "
         "Return JSON only with keys summary and steps. "
@@ -138,6 +152,7 @@ def _planning_prompt(task: Task) -> str:
         "steps must be an array of 3 to 5 short imperative strings.\n\n"
         f"Task Title: {task.title}\n"
         f"Task Description: {task.description}\n"
+        f"{brief_context}\n"
     )
 
 
