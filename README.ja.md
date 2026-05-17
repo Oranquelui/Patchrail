@@ -2,7 +2,44 @@
 
 Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現段階では CLI と headless core に絞り、`task -> plan -> run -> review -> approval` の状態遷移、artifact bundle、decision trace、approval ledger をローカルに残します。現在は `planner / reviewer / executor` に対して `provider × access_mode(api|subscription)` の候補集合を持ち、各フェーズ開始時に preflight と policy 解決を行って concrete assignment を固定保存します。
 
+![Patchrail terminal loading screen](patchrail-start.jpg)
+
+`patchrail start` が描画する Terminal の loading/start 画面です。Patchrail は、hosted dashboard より前に、まず Terminal だけで監督・検証・承認の流れを扱えることを重視しています。
+
 英語版の公開 README は [README.md](README.md) にあります。
+
+## 開発趣旨
+
+Patchrail は、coding agent を「速く動かす」ためだけの launcher ではありません。開発目的は、人間の意図、実装前の前提、agent の実行、実装後の証跡、レビュー、最終承認を、あとから検証できるローカル記録としてつなぐことです。
+
+中心にある chain は次です。
+
+```text
+human intent -> planning briefs -> plan snapshot -> runner execution -> harness evidence -> review -> approval
+```
+
+coding agent は、曖昧な指示からでも短時間で repository を変更できます。しかし、業務や顧客環境では「何を正しい完了状態とみなしたのか」「どの境界を越えてはいけなかったのか」「実際に runner が何をしたのか」「なぜ人間が承認したのか」が残っていなければ、安全に導入できません。
+
+そのため Patchrail は dashboard-first ではなく、CLI-first / headless-core-first で作っています。最初に必要なのは見た目ではなく、diff でき、test でき、review でき、ローカルに残る canonical record です。
+
+## なぜ必要か
+
+一般的な coding-agent workflow は、意図・実行・レビューの間にある隙間で壊れます。
+
+- chat transcript は意図を説明できますが、運用上の durable record ではありません。
+- plan は一見もっともらしく見えても、元の前提や境界から切り離されると危険です。
+- final diff の review だけでは、executor が最初の product / ontology / approval boundary の内側に留まったかを復元できません。
+- dashboard は整理されているように見えますが、canonical state、証跡、最終承認を誰が所有しているかを曖昧にすることがあります。
+
+Patchrail はこの問題を、5つの責務に分けて扱います。
+
+1. 実装前に、未来に成立しているべき状態を予測する。
+2. 実装前に、現実の ontology と承認境界を定義する。
+3. 実装前に、実装後の acceptance criteria を定義する。
+4. runner 実行前に、それらを canonical plan へ snapshot する。
+5. review / approval 前に、実装後の証跡を harness / artifact bundle として捕獲する。
+
+つまり Patchrail は autonomous agent を無制限に走らせる道具ではなく、人間の判断と agent 実行の受け渡しを明示する supervision rail です。
 
 ## 3分で見せるポイント
 

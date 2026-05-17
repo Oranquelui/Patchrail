@@ -2,11 +2,44 @@
 
 Patchrail is a local-first supervised coding-agent control plane for future-anchored product execution. It stays focused on a CLI-first, headless-core-first workflow that records `task -> plan -> run -> review -> approval` as explicit local state transitions, together with artifact bundles, decision traces, and approval ledgers.
 
-![Patchrail start screen](patchrail-start.jpg)
+![Patchrail terminal loading screen](patchrail-start.jpg)
+
+Terminal loading/start screen rendered by `patchrail start`. Patchrail is intentionally usable from a terminal before any hosted dashboard exists.
 
 Patchrail keeps coding-agent supervision in a local CLI instead of hiding planning, review, approval, and artifacts behind a backend runtime.
 
 Japanese usage notes live in [README.ja.md](README.ja.md).
+
+## Development Purpose
+
+Patchrail is being developed to make supervised coding-agent work auditable before, during, and after implementation. Modern coding agents can move from a vague instruction to repository changes very quickly; the hard part is proving what the operator meant, what boundaries were agreed, what the executor actually did, and why a human approved the result.
+
+The core purpose is to preserve that chain as local, inspectable records:
+
+```text
+human intent -> planning briefs -> plan snapshot -> runner execution -> harness evidence -> review -> approval
+```
+
+This is why Patchrail starts with a CLI and headless core rather than a dashboard. The first requirement is not presentation. The first requirement is a reliable local record that can be checked, diffed, tested, and reviewed without trusting a remote service.
+
+## Why This Is Necessary
+
+Coding-agent workflows usually fail in the gaps between intention, execution, and review:
+
+- A chat transcript can describe intent, but it is not a durable operational record.
+- A plan can look reasonable, but it becomes unsafe if it is disconnected from the assumptions and boundaries that produced it.
+- A review can inspect the final diff, but it cannot reconstruct whether the executor stayed inside the original product, ontology, and approval boundaries.
+- A dashboard can make the workflow look organized, but it can also hide which system owns canonical state, evidence, and final approval.
+
+Patchrail addresses those gaps by separating five concerns:
+
+1. Predict the desired future state before implementation.
+2. Define the real-world ontology and approval boundaries before implementation.
+3. Define post-implementation acceptance criteria before implementation.
+4. Snapshot those inputs into a canonical plan before the runner executes.
+5. Capture post-implementation evidence before review and approval.
+
+The result is not an autonomous-agent launcher. It is a supervision rail: a local control plane that makes the handoff between human judgment and agent execution explicit.
 
 ## What You Can Show In 3 Minutes
 
