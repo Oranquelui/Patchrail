@@ -17,6 +17,7 @@ from patchrail.models.entities import (
     ReviewResult,
     Run,
     Task,
+    VerificationRecord,
     serialize,
 )
 
@@ -42,6 +43,8 @@ class FilesystemStore:
             "approvals",
             "fallback_requests",
             "preflight_snapshots",
+            "verifications",
+            "verification_outputs",
             "artifacts",
             "workspaces",
             "ledgers",
@@ -132,6 +135,18 @@ class FilesystemStore:
             PreflightSnapshot.from_dict,
             "created_at",
         )
+
+    def save_verification(self, verification: VerificationRecord) -> None:
+        self._write_json(self.root / "verifications" / f"{verification.id}.json", serialize(verification))
+
+    def load_verification(self, verification_id: str) -> VerificationRecord:
+        return VerificationRecord.from_dict(self._read_json(self.root / "verifications" / f"{verification_id}.json"))
+
+    def list_verifications(self) -> list[VerificationRecord]:
+        return self._list_records(self.root / "verifications", VerificationRecord.from_dict, "created_at")
+
+    def verification_output_dir(self, verification_id: str) -> Path:
+        return self.root / "verification_outputs" / verification_id
 
     def save_artifact_bundle(self, bundle: ArtifactBundle) -> None:
         bundle_dir = self.artifact_dir(bundle.run_id)

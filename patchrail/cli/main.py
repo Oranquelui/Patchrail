@@ -50,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     setup_parser.add_argument("--quick", action="store_true")
     setup_parser.add_argument("--non-interactive", action="store_true")
     setup_parser.add_argument("--reset", action="store_true")
+    setup_parser.add_argument("--guided", action="store_true")
 
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--preset", choices=["local", "real"], default="local")
@@ -109,6 +110,20 @@ def build_parser() -> argparse.ArgumentParser:
     artifacts_parser = subparsers.add_parser("artifacts")
     artifacts_parser.add_argument("--run-id", required=True)
 
+    verify_parser = subparsers.add_parser("verify")
+    verify_parser.add_argument("--run-id", required=True)
+    verify_parser.add_argument("--command", dest="verify_command", required=True)
+
+    packet_parser = subparsers.add_parser("packet")
+    packet_subparsers = packet_parser.add_subparsers(dest="packet_command", required=True)
+    packet_show = packet_subparsers.add_parser("show")
+    packet_show.add_argument("--task-id", required=True)
+    packet_show.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    packet_export = packet_subparsers.add_parser("export")
+    packet_export.add_argument("--task-id", required=True)
+    packet_export.add_argument("--output", required=True)
+    packet_export.add_argument("--format", choices=["markdown", "json"], default="markdown")
+
     list_parser = subparsers.add_parser("list")
     list_subparsers = list_parser.add_subparsers(dest="list_command", required=True)
     list_subparsers.add_parser("tasks")
@@ -128,6 +143,10 @@ def build_parser() -> argparse.ArgumentParser:
     list_artifact_bundles.add_argument("--task-id")
     list_artifact_bundles.add_argument("--logical-kind")
     list_artifact_bundles.add_argument("--has-trace", action="store_true")
+    list_verifications = list_subparsers.add_parser("verifications")
+    list_verifications.add_argument("--task-id")
+    list_verifications.add_argument("--run-id")
+    list_subparsers.add_parser("review-queue")
 
     return parser
 
@@ -158,6 +177,7 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
             reset=args.reset,
             quick=args.quick,
             non_interactive=args.non_interactive,
+            guided=args.guided,
         )
     if args.command == "start":
         return app.start(preset=args.preset, workflow_backend=args.workflow_backend)
@@ -197,6 +217,12 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
         return app.get_logs(run_id=args.run_id)
     if args.command == "artifacts":
         return app.get_artifacts(run_id=args.run_id)
+    if args.command == "verify":
+        return app.verify_run(run_id=args.run_id, command=args.verify_command)
+    if args.command == "packet" and args.packet_command == "show":
+        return app.show_packet(task_id=args.task_id, output_format=args.format)
+    if args.command == "packet" and args.packet_command == "export":
+        return app.export_packet(task_id=args.task_id, output_path=args.output, output_format=args.format)
     if args.command == "list" and args.list_command == "tasks":
         return app.list_tasks()
     if args.command == "list" and args.list_command == "plans":
@@ -217,6 +243,10 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
             logical_kind=args.logical_kind,
             has_trace=args.has_trace,
         )
+    if args.command == "list" and args.list_command == "verifications":
+        return app.list_verifications(task_id=args.task_id, run_id=args.run_id)
+    if args.command == "list" and args.list_command == "review-queue":
+        return app.list_review_queue()
     raise PatchrailError("Unsupported command.")
 
 

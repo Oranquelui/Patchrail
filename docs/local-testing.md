@@ -13,6 +13,7 @@ patchrail --help
 patchrail setup
 patchrail start
 patchrail start --once
+sh scripts/check_release.sh --dry-run --python "$(command -v python3.13)"
 ```
 
 optional LangGraph runtime まで同じ install 導線で入れる場合:
@@ -21,7 +22,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```
 
 default output は人間向け summary です。machine-readable な JSON が必要な場合は `patchrail --json ...` を使います。`scripts/local_smoke_test.sh` は内部でこの mode を使います。
-`patchrail setup` は first-run 用の導線です。runtime config を作成し、preflight summary と次の具体コマンドを返します。`patchrail setup project --title ... --description ...` は task と `future / ontology / product` brief scaffold を作成します。
+`patchrail setup` は first-run 用の導線です。runtime config を作成し、preflight summary と次の具体コマンドを返します。`patchrail setup project --guided --title ... --description ...` は task と Delivery Contract 用の `future / ontology / product` brief scaffold を作成します。
 `patchrail start` は TTY では interactive shell に入り、`patchrail start --once` は splash を 1 回だけ描画します。
 
 ## Fastest Path
@@ -30,7 +31,7 @@ default output は人間向け summary です。machine-readable な JSON が必
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail setup
-patchrail setup project --title "First task" --description "Describe the supervised work"
+patchrail setup project --guided --title "First task" --description "Describe the supervised work"
 patchrail start
 ```
 `patchrail start` に入った後は `doctor`, `list tasks`, `task create ...`, `status --task-id ...`, `exit` をそのまま打てます。slash shortcut は `/help`, `/doctor`, `/tasks`, `/start`, `/exit` を使えます。
@@ -68,6 +69,8 @@ patchrail list plans
 patchrail list runs
 patchrail list reviews
 patchrail list approvals
+patchrail list verifications
+patchrail list review-queue
 patchrail list fallback-requests
 patchrail list preflight-snapshots
 patchrail list artifact-bundles --has-trace
@@ -80,6 +83,7 @@ patchrail --json status --task-id <task_id>
 - `task create`
 - `plan`
 - `run --runner auto`
+- `verify --command "python -c 'print(\"verification ok\")'"`
 - `review`
 - `approve`
 
@@ -180,8 +184,11 @@ patchrail plan \
   --step "Run harness"
 
 patchrail run --task-id <task_id> --runner auto
+patchrail verify --run-id <run_id> --command "pytest -q"
 patchrail review --run-id <run_id> --verdict pass --summary "Looks good"
 patchrail approve --task-id <task_id> --rationale "Local test passed"
+patchrail packet show --task-id <task_id>
+patchrail packet export --task-id <task_id> --output packet.md
 patchrail status --task-id <task_id>
 patchrail artifacts --run-id <run_id>
 patchrail logs --run-id <run_id>
@@ -189,6 +196,8 @@ patchrail list artifact-bundles --task-id <task_id>
 patchrail list tasks
 patchrail list plans --task-id <task_id>
 patchrail list runs --task-id <task_id>
+patchrail list verifications --task-id <task_id>
+patchrail list review-queue
 patchrail list reviews --task-id <task_id>
 patchrail list approvals --task-id <task_id>
 patchrail list preflight-snapshots --task-id <task_id>
@@ -234,6 +243,8 @@ sh scripts/local_smoke_test.sh
 - `.patchrail/approvals/`
 - `.patchrail/fallback_requests/`
 - `.patchrail/preflight_snapshots/`
+- `.patchrail/verifications/`
+- `.patchrail/verification_outputs/`
 - `.patchrail/config/role-policy.json`
 - `.patchrail/config/workflow-backend.json`
 - `.patchrail/artifacts/<run_id>/`

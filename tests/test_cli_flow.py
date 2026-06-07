@@ -74,7 +74,7 @@ def test_setup_runtime_bootstraps_config_and_reports_setup_next_steps(
     assert setup["workflow_backend"] == "local"
     assert setup["preflight"]["planner"]["selected_candidate"]["candidate_name"] == "claude_subscription_planner"
     assert setup["next_steps"] == [
-        'patchrail setup project --title "First task" --description "Describe the supervised work"',
+        'patchrail setup project --guided --title "First task" --description "Describe the supervised work"',
         "patchrail doctor",
         "sh scripts/local_smoke_test.sh",
     ]

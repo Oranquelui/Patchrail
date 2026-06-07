@@ -54,6 +54,11 @@ class BriefKind(StrEnum):
     PRODUCT = "product"
 
 
+class VerificationStatus(StrEnum):
+    PASSED = "passed"
+    FAILED = "failed"
+
+
 @dataclass(slots=True)
 class CostMetrics:
     prompt_tokens: int
@@ -402,6 +407,37 @@ class PreflightSnapshot:
             else None,
             preflight_results=[PreflightResult.from_dict(item) for item in payload.get("preflight_results", [])],
             fallback_event=FallbackEvent.from_dict(payload["fallback_event"]) if payload.get("fallback_event") else None,
+            created_at=payload["created_at"],
+        )
+
+
+@dataclass(slots=True)
+class VerificationRecord:
+    id: str
+    task_id: str
+    run_id: str
+    command: str
+    cwd: str
+    exit_code: int
+    status: VerificationStatus
+    stdout_path: str
+    stderr_path: str
+    elapsed_seconds: float
+    created_at: str
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> VerificationRecord:
+        return cls(
+            id=payload["id"],
+            task_id=payload["task_id"],
+            run_id=payload["run_id"],
+            command=payload["command"],
+            cwd=payload["cwd"],
+            exit_code=int(payload["exit_code"]),
+            status=VerificationStatus(payload["status"]),
+            stdout_path=payload["stdout_path"],
+            stderr_path=payload["stderr_path"],
+            elapsed_seconds=float(payload["elapsed_seconds"]),
             created_at=payload["created_at"],
         )
 
