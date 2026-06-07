@@ -10,6 +10,17 @@ Patchrail keeps coding-agent supervision local instead of hiding planning, verif
 
 Japanese usage notes live in [README.ja.md](README.ja.md).
 
+## What This Demonstrates
+
+Patchrail is intended to be read as a serious engineering portfolio project, not only as a CLI prototype. It demonstrates:
+
+- Product judgment: narrowing the problem from generic agent orchestration to verification and approval packets for AI-coded changes.
+- Systems design: explicit lifecycle records, role separation, approval boundaries, local persistence, and resumable state.
+- Practical CLI execution: commands that create tasks, capture Delivery Contracts, run executors, record verification, and export review-ready packets.
+- Engineering discipline: focused tests, smoke tests, package metadata, release checks, and a local-first storage model that can be inspected from disk.
+
+For interview-oriented material, see the [3-minute demo guide](docs/three-minute-demo.md) and [resume positioning notes](docs/resume-positioning.md).
+
 ## Development Purpose
 
 Patchrail is being developed to make AI coding-agent work auditable before, during, and after implementation. Modern coding agents can move from a vague instruction to repository changes very quickly; the hard part is proving what the operator meant, what boundaries were agreed, what the executor actually did, what verification ran, and why a human approved the result.
@@ -44,7 +55,7 @@ The result is not an autonomous-agent launcher and not an approval-button factor
 
 ## What You Can Show In 3 Minutes
 
-Patchrail demonstrates a practical safety boundary for coding agents in customer or client repositories:
+Patchrail demonstrates a practical safety boundary for AI coding work:
 
 1. Create a task that describes the supervised work.
 2. Attach future, ontology, and product briefs before implementation begins.
@@ -55,7 +66,9 @@ Patchrail demonstrates a practical safety boundary for coding agents in customer
 7. Export a review-ready approval packet before any final approval.
 8. Record the human approval decision and ledgers locally.
 
-For a public-facing walkthrough, see [Supervised Agent Rollout](docs/case-studies/supervised-agent-rollout.md).
+The point is not to make an agent autonomous by default. The point is to make the handoff between human intent, agent execution, review evidence, and final approval inspectable from disk.
+
+For a public-facing walkthrough, see the [3-minute demo guide](docs/three-minute-demo.md) and [Supervised Agent Rollout](docs/case-studies/supervised-agent-rollout.md).
 
 ## Why Patchrail
 
@@ -191,6 +204,8 @@ patchrail --json status --task-id <task_id>
 - [Evidence Bundle v1](docs/contracts/evidence-bundle-v1.md)
 - [Patchrail Supervise Skill](skills/patchrail-supervise/SKILL.md)
 - [MVP](docs/mvp.md)
+- [3-Minute Demo](docs/three-minute-demo.md)
+- [Resume Positioning](docs/resume-positioning.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
 - [Changelog](CHANGELOG.md)
