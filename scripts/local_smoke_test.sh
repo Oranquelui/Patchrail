@@ -14,6 +14,12 @@ PATCHRAIL_AUTO_PLAN=${PATCHRAIL_AUTO_PLAN:-0}
 PATCHRAIL_PLAN_ACCESS_MODE=${PATCHRAIL_PLAN_ACCESS_MODE:-auto}
 PATCHRAIL_AUTO_REVIEW=${PATCHRAIL_AUTO_REVIEW:-0}
 PATCHRAIL_REVIEW_ACCESS_MODE=${PATCHRAIL_REVIEW_ACCESS_MODE:-auto}
+PATCHRAIL_VERIFY_COMMAND=${PATCHRAIL_VERIFY_COMMAND:-}
+PATCHRAIL_PACKET_OUTPUT=${PATCHRAIL_PACKET_OUTPUT:-"$PATCHRAIL_HOME/smoke-approval-packet.md"}
+
+if [ -z "$PATCHRAIL_VERIFY_COMMAND" ]; then
+  PATCHRAIL_VERIFY_COMMAND="$PYTHON_BIN -c 'print(\"verification ok\")'"
+fi
 
 if [ -z "$PATCHRAIL_AUTO_APPROVE_FALLBACK" ]; then
   if [ "$PATCHRAIL_CONFIG_PRESET" = "real" ]; then
@@ -76,6 +82,7 @@ run_patchrail preflight --role reviewer >/dev/null
 run_patchrail preflight --role executor --runner "$PATCHRAIL_RUNNER" >/dev/null
 
 setup_output=$(run_patchrail setup project \
+  --guided \
   --title "Local Smoke Test" \
   --description "Exercise the local Patchrail flow")
 task_id=$(printf '%s' "$setup_output" | json_query setup task id)
@@ -144,6 +151,14 @@ fi
 
 run_id=$(printf '%s' "$run_output" | json_query run id)
 
+verify_output=$(run_patchrail verify --run-id "$run_id" --command "$PATCHRAIL_VERIFY_COMMAND")
+verification_id=$(printf '%s' "$verify_output" | json_query verification id)
+verification_status=$(printf '%s' "$verify_output" | json_query verification status)
+if [ "$verification_status" != "passed" ]; then
+  printf '%s\n' "$verify_output" >&2
+  exit 1
+fi
+
 if [ "$PATCHRAIL_AUTO_REVIEW" = "1" ]; then
   run_patchrail review \
     --run-id "$run_id" \
@@ -160,10 +175,14 @@ run_patchrail approve \
   --task-id "$task_id" \
   --rationale "Local smoke flow passed" >/dev/null
 
+mkdir -p "$(dirname "$PATCHRAIL_PACKET_OUTPUT")"
+run_patchrail packet export --task-id "$task_id" --output "$PATCHRAIL_PACKET_OUTPUT" >/dev/null
+run_patchrail packet show --task-id "$task_id" >/dev/null
+
 status_output=$(run_patchrail status --task-id "$task_id")
 final_state=$(printf '%s' "$status_output" | json_query task state)
 
-printf 'Local smoke flow completed: preset=%s workflow_backend=%s task=%s run=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s\n' \
-  "$PATCHRAIL_CONFIG_PRESET" "$PATCHRAIL_WORKFLOW_BACKEND" "$task_id" "$run_id" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW"
+printf 'Local smoke flow completed: preset=%s workflow_backend=%s task=%s run=%s verification=%s verification_status=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s packet=%s\n' \
+  "$PATCHRAIL_CONFIG_PRESET" "$PATCHRAIL_WORKFLOW_BACKEND" "$task_id" "$run_id" "$verification_id" "$verification_status" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW" "$PATCHRAIL_PACKET_OUTPUT"
 printf 'Brief schema validation: schema=%s briefs=%s\n' "patchrail.brief_schema.v1" "$brief_count"
 printf 'PATCHRAIL_HOME=%s\n' "$PATCHRAIL_HOME"

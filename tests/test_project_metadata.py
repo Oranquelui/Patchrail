@@ -22,8 +22,23 @@ def test_repo_includes_mit_license_file() -> None:
 def test_pyproject_declares_mit_license_metadata() -> None:
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())["project"]
 
-    assert project["license"] == {"text": "MIT"}
-    assert "License :: OSI Approved :: MIT License" in project["classifiers"]
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
+    assert "License :: OSI Approved :: MIT License" not in project["classifiers"]
+
+
+def test_pyproject_declares_public_pypi_metadata() -> None:
+    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())["project"]
+
+    assert project["version"] == "0.2.0a1"
+    assert project["description"] == "Local-first verification and approval packets for AI coding agent work"
+    assert "ai-coding" in project["keywords"]
+    assert "verification" in project["keywords"]
+    assert "approval" in project["keywords"]
+    assert "Programming Language :: Python :: 3.12" in project["classifiers"]
+    assert "Topic :: Software Development :: Quality Assurance" in project["classifiers"]
+    assert project["urls"]["Repository"] == "https://github.com/Oranquelui/Patchrail"
+    assert project["urls"]["Documentation"] == "https://github.com/Oranquelui/Patchrail#readme"
 
 
 def test_release_version_is_synchronized() -> None:
@@ -74,6 +89,9 @@ def test_english_readme_exists_without_japanese_text() -> None:
     assert not JAPANESE_TEXT_RE.search(readme)
     assert "README.ja.md" in readme
     assert "patchrail-start.jpg" in readme
+    assert "scripts/install_cli.sh" in readme
+    assert "patchrail packet show" in readme
+    assert "patchrail verify" in readme
 
 
 def test_readme_screenshot_exists_at_repo_root() -> None:

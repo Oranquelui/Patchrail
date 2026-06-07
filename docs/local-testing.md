@@ -1,251 +1,123 @@
 # Local Testing
 
-## Goal
-Patchrail を手元で end-to-end に試し、task 生成から approval までの最小フローとローカル永続化を確認する。
+Patchrail is tested as a local-first CLI. Use a temporary `PATCHRAIL_HOME` when you want a clean run without touching the repo-local `.patchrail/` store.
 
-## Install CLI
+## Install
+
 ```bash
 cd /path/to/Patchrail
-brew install pipx
-pipx ensurepath
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
-patchrail --help
-patchrail setup
-patchrail start
-patchrail start --once
-```
-
-optional LangGraph runtime まで同じ install 導線で入れる場合:
-```bash
 sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```
 
-default output は人間向け summary です。machine-readable な JSON が必要な場合は `patchrail --json ...` を使います。`scripts/local_smoke_test.sh` は内部でこの mode を使います。
-`patchrail setup` は first-run 用の導線です。runtime config を作成し、preflight summary と次の具体コマンドを返します。`patchrail setup project --title ... --description ...` は task と `future / ontology / product` brief scaffold を作成します。
-生成された brief scaffold と `brief create` 後の `.patchrail/briefs/<brief_id>.json` には `patchrail.brief_schema.v1` が入ります。
-`patchrail start` は TTY では interactive shell に入り、`patchrail start --once` は splash を 1 回だけ描画します。
+Default output is human-readable. Use `patchrail --json ...` for machine-readable automation.
+
+`patchrail setup` bootstraps runtime config and preflight summary. `patchrail setup project --guided --title ... --description ...` creates a task and Delivery Contract-oriented `future / ontology / product` brief scaffolds. Generated scaffolds and persisted brief records use `patchrail.brief_schema.v1`.
 
 ## Fastest Path
-1. CLI を install する。
+
 ```bash
 cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail setup
-patchrail setup project --title "First task" --description "Describe the supervised work"
+patchrail setup project --guided --title "First task" --description "Describe the supervised work"
 patchrail brief validate --task-id <task_id>
 patchrail start
 ```
-`patchrail start` に入った後は `doctor`, `list tasks`, `task create ...`, `status --task-id ...`, `exit` をそのまま打てます。slash shortcut は `/help`, `/doctor`, `/tasks`, `/start`, `/exit` を使えます。
-2. role policy を初期化し、preflight を確認する。
+
+## Smoke Test
+
 ```bash
-# local preset
-patchrail setup
+PATCHRAIL_HOME="$(mktemp -d)/.patchrail" \
+PYTHON_BIN=/opt/homebrew/bin/python3.13 \
+PATCHRAIL_CONFIG_PRESET=local \
+PATCHRAIL_WORKFLOW_BACKEND=local \
+sh scripts/local_smoke_test.sh
+```
+
+`scripts/local_smoke_test.sh` performs:
+
+- `config init`
+- planner, reviewer, and executor `preflight`
+- `setup project --guided`
+- `brief create` for `future`, `ontology`, and `product`
+- `brief validate`
+- `plan`
+- `run --runner auto`
+- `verify --command "$PATCHRAIL_VERIFY_COMMAND"`
+- `review`
+- `approve`
+- `packet export`
+- `packet show`
+
+Expected final output includes:
+
+```text
+Local smoke flow completed: ...
+Brief schema validation: schema=patchrail.brief_schema.v1 briefs=3
+PATCHRAIL_HOME=...
+```
+
+## Useful Commands
+
+```bash
+patchrail config init --workflow-backend local
 patchrail config init --workflow-backend langgraph
+patchrail config init --preset real --workflow-backend local
+
 patchrail preflight --role planner
 patchrail preflight --role reviewer
 patchrail preflight --role executor --runner auto
 patchrail contracts runner
 
-# real preset
-patchrail config init --preset real --workflow-backend local
-patchrail preflight --role executor --runner auto
-
-# api executor path
-patchrail preflight --role executor --runner grok_runner --access-mode api
-```
-3. テストを実行する。
-```bash
-pytest -q
-```
-4. smoke flow を実行する。
-```bash
-sh scripts/local_smoke_test.sh
-PATCHRAIL_CONFIG_PRESET=real PATCHRAIL_AUTO_APPROVE_FALLBACK=1 sh scripts/local_smoke_test.sh
-PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
-PATCHRAIL_WORKFLOW_BACKEND=langgraph PATCHRAIL_AUTO_PLAN=1 PATCHRAIL_AUTO_REVIEW=1 sh scripts/local_smoke_test.sh
-```
-5. 保存済みレコードを一覧する。
-```bash
-patchrail list tasks
-patchrail list plans
-patchrail list runs
-patchrail list reviews
-patchrail list approvals
-patchrail list fallback-requests
-patchrail list preflight-snapshots
-patchrail list artifact-bundles --has-trace
 patchrail brief validate --task-id <task_id>
 patchrail --json contracts runner
 patchrail --json status --task-id <task_id>
+patchrail verify --run-id <run_id> --command "pytest -q"
+patchrail list verifications --run-id <run_id>
+patchrail list review-queue
+patchrail packet show --task-id <task_id>
+patchrail packet export --task-id <task_id> --output approval-packet.md
 ```
 
-`scripts/local_smoke_test.sh` は以下を自動で行う:
-- `config init`
-- `preflight`
-- `setup project`
-- `brief create` for `future`, `ontology`, and `product`
-- `brief validate`
-- `plan`
-- `run --runner auto`
-- `review`
-- `approve`
+## Artifact Checks
 
-利用可能な環境変数:
-- `PATCHRAIL_CONFIG_PRESET=local|real`
-- `PATCHRAIL_WORKFLOW_BACKEND=local|langgraph`
-- `PATCHRAIL_RUNNER=auto|claude_code|grok_runner|codex_runner`
-- `PATCHRAIL_AUTO_APPROVE_FALLBACK=0|1`
-- `PATCHRAIL_AUTO_PLAN=0|1`
-- `PATCHRAIL_PLAN_ACCESS_MODE=auto|api|subscription`
-- `PATCHRAIL_AUTO_REVIEW=0|1`
-- `PATCHRAIL_REVIEW_ACCESS_MODE=auto|api|subscription`
+JSON output for `status`, `artifacts`, and `list artifact-bundles` includes `schema_version=patchrail.evidence_bundle.v1` on persisted evidence bundles.
 
-デフォルトの `local` preset は `planner / reviewer / executor` に simulation-backed な subscription 候補を持ち、`python -m patchrail.runners.local_harness` を command として使う。これにより、実際の API key や CLI login がなくても policy 解決と end-to-end flow を再現できる。workflow backend は `config init --workflow-backend local|langgraph` で永続化され、`PATCHRAIL_WORKFLOW_BACKEND` は smoke や一時検証向けの override として使える。
+The local harness trace includes `contract_runtime`, which records the observed Runner Contract v1 schema-version environment variable, workspace-relative handoff paths, and ready runner-writable paths. The same trace is mirrored to `.patchrail/workspaces/<run_id>/trace.json` before Patchrail persists it into the canonical evidence bundle.
 
-`real` preset を使う場合:
-- `patchrail config init --preset real`
-- `codex subscription` は `codex login status` を使う
-- `claude subscription` は `claude auth status` を使う
-- `grok` は API-only で、`grok subscription` 候補は既定 policy に含めない
-
-API 候補を試す場合は、対応する環境変数を設定する:
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `XAI_API_KEY`
-
-API executor の最短手順:
-```bash
-patchrail preflight --role executor --runner grok_runner --access-mode api
-patchrail run --task-id <task_id> --runner grok_runner --access-mode api
-```
-
-Claude subscription executor の最短手順:
-```bash
-patchrail preflight --role executor --runner claude_code --access-mode subscription
-patchrail run --task-id <task_id> --runner claude_code --access-mode subscription
-```
-
-Codex subscription executor の最短手順:
-```bash
-patchrail preflight --role executor --runner codex_runner --access-mode subscription
-patchrail run --task-id <task_id> --runner codex_runner --access-mode subscription
-```
-
-Auto planner / reviewer の最短手順:
-```bash
-patchrail config init --workflow-backend local
-patchrail plan --task-id <task_id> --auto
-patchrail review --run-id <run_id> --auto
-
-# real preset で reviewer を Codex subscription path に寄せる場合
-patchrail review --run-id <run_id> --auto
-
-# real preset で reviewer を Claude API path に寄せる場合
-patchrail review --run-id <run_id> --auto --access-mode api
-```
-
-LangGraph backend を試す最短手順:
-```bash
-pip install -e '.[langgraph]'
-patchrail config init --workflow-backend langgraph
-patchrail plan --task-id <task_id> --auto
-```
-
-成功すると、plan / review JSON に `workflow_backend=langgraph` と `workflow_metadata.node_trace` が残る。現行 MVP の graph は stateless なので、LangGraph の subordinate state は canonical continuation data にはせず、Patchrail record に要約 metadata だけを保存する。
-
-artifact metadata を確認する最短手順:
-```bash
-patchrail status --task-id <task_id>
-patchrail list artifact-bundles --task-id <task_id>
-patchrail list artifact-bundles --logical-kind runner_trace --has-trace
-```
-JSON output for `status`, `artifacts`, and `list artifact-bundles` includes `schema_version=patchrail.evidence_bundle.v1` on each persisted evidence bundle.
-The local harness trace also includes `contract_runtime`, which records the observed Runner Contract v1 schema-version environment variable, workspace-relative handoff paths, and ready runner-writable paths. The same trace is mirrored to `.patchrail/workspaces/<run_id>/trace.json` before Patchrail persists it into the canonical evidence bundle.
 Runner-local artifacts written under `.patchrail/workspaces/<run_id>/artifacts/` are copied into `.patchrail/artifacts/<run_id>/runner-artifacts/` and exposed as `runner_artifact` manifest entries. The local harness smoke path writes `local-harness-report.json` so operators can verify the collection path without external runner dependencies.
 
-## Manual Flow
+Verification stdout/stderr are stored under `.patchrail/verification_outputs/<verification_id>/`.
+
+## Full Verification
+
 ```bash
-cd /path/to/Patchrail
-export PATCHRAIL_HOME="$PWD/.patchrail"
-
-# local preset
-patchrail config init
-patchrail preflight --role planner
-patchrail preflight --role reviewer
-patchrail preflight --role executor --runner auto
-
-# real preset
-patchrail config init --preset real
-patchrail preflight --role executor --runner auto
-patchrail preflight --role executor --runner grok_runner --access-mode api
-
-patchrail task create \
-  --title "Manual local test" \
-  --description "Verify local flow"
-
-patchrail plan \
-  --task-id <task_id> \
-  --summary "Run local harness" \
-  --step "Resolve planner candidate" \
-  --step "Run harness"
-
-patchrail run --task-id <task_id> --runner auto
-patchrail review --run-id <run_id> --verdict pass --summary "Looks good"
-patchrail approve --task-id <task_id> --rationale "Local test passed"
-patchrail status --task-id <task_id>
-patchrail artifacts --run-id <run_id>
-patchrail logs --run-id <run_id>
-patchrail list artifact-bundles --task-id <task_id>
-patchrail list tasks
-patchrail list plans --task-id <task_id>
-patchrail list runs --task-id <task_id>
-patchrail list reviews --task-id <task_id>
-patchrail list approvals --task-id <task_id>
-patchrail list preflight-snapshots --task-id <task_id>
-```
-
-cross-provider または cross-access-mode fallback を試す場合:
-```bash
-patchrail run --task-id <task_id> --runner auto
-patchrail status --task-id <task_id>
-patchrail approve-fallback --task-id <task_id> --rationale "Allow deviation"
-patchrail run --task-id <task_id> --runner auto
-```
-
-`real` preset では executor の先頭候補が `grok api` だが、`XAI_API_KEY` が無い場合は `claude subscription` への fallback approval が必要になる。これは監査境界を確認するための意図的な構成。
-
-一方で `--runner grok_runner --access-mode api` を使えば、`grok_api_executor` を直接選べる。これは live API path の疎通確認に向いている。
-
-`--runner claude_code --access-mode subscription` を使えば、`claude_subscription_executor` を直接選べる。これは live subscription path の疎通確認に向いている。
-
-`--runner codex_runner --access-mode subscription` を使えば、`codex_subscription_executor` を直接選べる。workspace 非 git directory でも `codex exec --skip-git-repo-check` 経由で supervised execution を試せる。
-
-最短の real smoke:
-```bash
-PATCHRAIL_HOME="$PWD/.patchrail-real" \
-PATCHRAIL_CONFIG_PRESET=real \
-PATCHRAIL_AUTO_APPROVE_FALLBACK=1 \
+/opt/homebrew/bin/python3.13 -m pytest -q
+/opt/homebrew/bin/python3.13 -m compileall -q patchrail tests
+/opt/homebrew/bin/python3.13 -m patchrail.cli --help
+/opt/homebrew/bin/python3.13 -m patchrail.cli --json contracts runner
 sh scripts/local_smoke_test.sh
 ```
 
-最短の local auto smoke:
+Release package checks:
+
 ```bash
-PATCHRAIL_HOME="$PWD/.patchrail-auto" \
-PATCHRAIL_AUTO_PLAN=1 \
-PATCHRAIL_AUTO_REVIEW=1 \
-sh scripts/local_smoke_test.sh
+sh scripts/check_release.sh --python /opt/homebrew/bin/python3.13 --dry-run
+sh scripts/check_release.sh --python /opt/homebrew/bin/python3.13
 ```
 
-## Files To Inspect
-- `.patchrail/tasks/`
-- `.patchrail/plans/`
-- `.patchrail/runs/`
-- `.patchrail/reviews/`
-- `.patchrail/approvals/`
-- `.patchrail/fallback_requests/`
-- `.patchrail/preflight_snapshots/`
+## Files Created
+
 - `.patchrail/config/role-policy.json`
 - `.patchrail/config/workflow-backend.json`
+- `.patchrail/tasks/<task_id>.json`
+- `.patchrail/briefs/<brief_id>.json`
+- `.patchrail/plans/<plan_id>.json`
+- `.patchrail/runs/<run_id>.json`
+- `.patchrail/verifications/<verification_id>.json`
+- `.patchrail/verification_outputs/<verification_id>/stdout.log`
+- `.patchrail/verification_outputs/<verification_id>/stderr.log`
 - `.patchrail/artifacts/<run_id>/`
 - `.patchrail/artifacts/<run_id>/runner-artifacts/`
 - `.patchrail/artifacts/<run_id>/trace.json`

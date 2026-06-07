@@ -38,6 +38,10 @@ def render_payload(args: Any, payload: dict[str, Any]) -> str:
         return _render_logs(payload)
     if args.command == "artifacts":
         return _render_artifacts(payload)
+    if args.command == "verify":
+        return _render_verification(payload)
+    if args.command == "packet":
+        return _render_packet(getattr(args, "packet_command", ""), payload)
     if args.command == "list":
         return _render_list(getattr(args, "list_command", ""), payload)
     return _render_unknown(payload)
@@ -433,7 +437,37 @@ def _render_artifacts(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_verification(payload: dict[str, Any]) -> str:
+    verification = payload["verification"]
+    return "\n".join(
+        [
+            f"Recorded verification {verification['id']} for run {verification['run_id']}",
+            f"Status: {verification['status']}",
+            f"Exit code: {verification['exit_code']}",
+            f"Command: {verification['command']}",
+            f"Stdout: {verification['stdout_path']}",
+            f"Stderr: {verification['stderr_path']}",
+        ]
+    )
+
+
+def _render_packet(packet_command: str, payload: dict[str, Any]) -> str:
+    if packet_command == "show":
+        return payload["content"].rstrip()
+    if packet_command == "export":
+        return "\n".join(
+            [
+                "Exported approval packet",
+                f"Format: {payload['format']}",
+                f"Output: {payload['output_path']}",
+            ]
+        )
+    return _render_unknown(payload)
+
+
 def _render_list(list_command: str, payload: dict[str, Any]) -> str:
+    if list_command == "review-queue":
+        return _render_review_queue(payload)
     key = {
         "tasks": "tasks",
         "plans": "plans",
@@ -443,6 +477,7 @@ def _render_list(list_command: str, payload: dict[str, Any]) -> str:
         "fallback-requests": "fallback_requests",
         "preflight-snapshots": "preflight_snapshots",
         "artifact-bundles": "artifact_bundles",
+        "verifications": "verifications",
     }[list_command]
     items = payload.get(key, [])
     title = key.replace("_", " ")
@@ -451,6 +486,17 @@ def _render_list(list_command: str, payload: dict[str, Any]) -> str:
         return "\n".join(lines)
     for item in items:
         lines.append(f"  {_list_item_summary(key, item)}")
+    return "\n".join(lines)
+
+
+def _render_review_queue(payload: dict[str, Any]) -> str:
+    queue = payload["review_queue"]
+    lines = ["Review Queue"]
+    for group in ("needs_verification", "failed_verification", "ready_for_review", "awaiting_approval", "approved"):
+        items = queue[group]
+        lines.append(f"{group}: {len(items)}")
+        for item in items:
+            lines.append(f"  {item['id']} | {item['state']} | {item['title']}")
     return "\n".join(lines)
 
 
@@ -471,6 +517,8 @@ def _list_item_summary(key: str, item: dict[str, Any]) -> str:
         return f"{item['id']} | task={item['task_id']} | {item['phase']} | {item['role']}"
     if key == "artifact_bundles":
         return f"{item['run_id']} | {item['summary']}"
+    if key == "verifications":
+        return f"{item['id']} | run={item['run_id']} | {item['status']} | exit={item['exit_code']}"
     return str(item)
 
 

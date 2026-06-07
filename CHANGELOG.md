@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## v0.2.0-alpha.1 - 2026-06-26
 
-Direction-setting alpha release for the skill-first, CLI-backed Patchrail roadmap.
+Direction-setting alpha release for AI coding verification, approval packets, and the skill-first, CLI-backed Patchrail roadmap.
 
 ### Added
 
@@ -12,14 +12,21 @@ Direction-setting alpha release for the skill-first, CLI-backed Patchrail roadma
 - `patchrail brief validate` for read-only readiness checks over the required planning brief sequence.
 - Runner Contract v1 for shell-backed executor handoff, reserved environment variables, workspace paths, and read-only CLI inspection through `patchrail contracts runner`.
 - Evidence Bundle v1 manifest metadata, schema markers, structured runner trace support, and canonical collection of runner-local artifacts.
-- Local smoke coverage that creates all three briefs, validates them, executes the local harness, persists runner evidence, reviews, and records human approval.
+- `patchrail verify` for recording operator-specified verification commands, exit codes, elapsed time, and stdout/stderr output paths.
+- `patchrail list verifications` and `patchrail list review-queue` for local review triage across AI coding runs.
+- `patchrail packet show|export` for Markdown and JSON approval packets built from existing local records.
+- `patchrail setup project --guided` for Delivery Contract-oriented Future, Ontology, and Product prompt scaffolds while preserving existing brief storage.
+- Release check script for build, isolated wheel install, CLI help, and local smoke verification.
+- Local smoke coverage that creates all three briefs, validates them, executes the local harness, records verification evidence, exports an approval packet, reviews, and records human approval.
 - First public `patchrail-supervise` Agent Skill scaffold for Codex, Claude Code, Grok Build, and compatible agents.
 
 ### Changed
 
 - README and PRD direction now separate implemented alpha behavior from the next `ApprovalProfile v1`, `RunLedger v1`, and skill-first delegation work.
+- Public positioning now emphasizes local verification evidence and approval packets for AI coding agent work.
 - Runner invocation metadata now includes the Runner Contract schema version, artifact directory, and trace file path.
 - Local harness output now includes runtime contract evidence and a reproducibility report collected into the canonical evidence bundle.
+- Project metadata now uses modern license metadata and public package keywords for AI coding verification.
 
 ### Not Yet Included
 
