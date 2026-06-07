@@ -8,6 +8,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_cli.sh"
+RELEASE_CHECK_SCRIPT = REPO_ROOT / "scripts" / "check_release.sh"
 
 
 def test_install_script_dry_run_prints_base_pipx_install_command() -> None:
@@ -40,6 +41,23 @@ def test_install_script_dry_run_prints_langgraph_injection_command() -> None:
     assert completed.returncode == 0
     assert "pipx uninstall patchrail" in completed.stdout
     assert "pipx inject patchrail langgraph" in completed.stdout
+
+
+def test_release_check_dry_run_prints_build_install_and_smoke_commands() -> None:
+    completed = subprocess.run(
+        ["/bin/sh", str(RELEASE_CHECK_SCRIPT), "--dry-run", "--python", "python3.13"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert "python3.13 -m build" in completed.stdout
+    assert "pip install" in completed.stdout
+    assert "patchrail --help" in completed.stdout
+    assert "sh scripts/local_smoke_test.sh" in completed.stdout
 
 
 def test_install_script_runs_pipx_from_safe_directory_and_reinstalls_when_present(

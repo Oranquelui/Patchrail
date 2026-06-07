@@ -1,26 +1,26 @@
 # Patchrail
 
-Patchrail is a local-first supervised coding-agent control plane for future-anchored product execution. It stays focused on a CLI-first, headless-core-first workflow that records `task -> plan -> run -> review -> approval` as explicit local state transitions, together with artifact bundles, decision traces, and approval ledgers.
+Patchrail is a local-first verification and approval packet CLI for AI coding agent work. Run Claude, Codex, Cursor, or another coding workflow, then use Patchrail to prove what changed, what was verified, and whether the result is ready for human approval.
 
 ![Patchrail terminal loading screen](patchrail-start.jpg)
 
 Terminal loading/start screen rendered by `patchrail start`. Patchrail is intentionally usable from a terminal before any hosted dashboard exists.
 
-Patchrail keeps coding-agent supervision in a local CLI instead of hiding planning, review, approval, and artifacts behind a backend runtime.
+Patchrail keeps coding-agent supervision in a local CLI instead of hiding plans, runs, verification output, review decisions, approval ledgers, and artifacts behind a backend runtime.
 
 Japanese usage notes live in [README.ja.md](README.ja.md).
 
 ## Development Purpose
 
-Patchrail is being developed to make supervised coding-agent work auditable before, during, and after implementation. Modern coding agents can move from a vague instruction to repository changes very quickly; the hard part is proving what the operator meant, what boundaries were agreed, what the executor actually did, and why a human approved the result.
+Patchrail is being developed to make AI-coded changes auditable before, during, and after implementation. Modern coding agents can move from a vague instruction to repository changes very quickly; the hard part is proving what the operator meant, what changed, which checks ran, and why a human approved or rejected the result.
 
 The core purpose is to preserve that chain as local, inspectable records:
 
 ```text
-human intent -> planning briefs -> plan snapshot -> runner execution -> harness evidence -> review -> approval
+human intent -> delivery contract -> plan snapshot -> runner execution -> verification evidence -> review -> approval packet
 ```
 
-This is why Patchrail starts with a CLI and headless core rather than a dashboard. The first requirement is not presentation. The first requirement is a reliable local record that can be checked, diffed, tested, and reviewed without trusting a remote service.
+This is why Patchrail starts with a CLI and headless core rather than a dashboard. The first requirement is not presentation. The first requirement is a reliable local record that can be checked, diffed, tested, packaged, and reviewed without trusting a remote service.
 
 ## Why This Is Necessary
 
@@ -49,8 +49,9 @@ Patchrail demonstrates a practical safety boundary for coding agents in customer
 2. Attach future, ontology, and product briefs before implementation begins.
 3. Store a canonical plan that references those briefs.
 4. Run an executor behind an explicit runner assignment.
-5. Review the persisted run artifacts before any final approval.
-6. Record the human approval decision and ledgers locally.
+5. Run operator-specified verification commands against the completed work.
+6. Export a review-ready approval packet before any final approval.
+7. Record the human approval decision and ledgers locally.
 
 The point is not to make an agent autonomous by default. The point is to make the handoff between human intent, agent execution, review evidence, and final approval inspectable from disk.
 
@@ -61,29 +62,38 @@ For a public-facing walkthrough, see [Supervised Agent Rollout](docs/case-studie
 - Keep the canonical workflow record in Patchrail rather than in a backend runtime.
 - Preserve clear role separation across planner, reviewer, executor, and human approver.
 - Constrain present implementation work with operator-defined completion, ontology, and scope documents rather than letting the next tool call decide the shape of the product.
-- Make approval boundaries, fallback approvals, artifacts, and decision traces inspectable from disk.
+- Make approval boundaries, fallback approvals, artifacts, verification results, packets, and decision traces inspectable from disk.
 - Support optional workflow backends, including LangGraph, without handing over canonical state ownership.
 
-## Phase 1 Direction
+## v0.2 Direction
 
-The next planning layer is aimed at turning Patchrail into a supervised control plane for product definition before execution starts.
+The next public release focuses on AI coding verification, not generic agent orchestration. The flagship loop is:
 
-Phase 1 is structured around two onboarding passes:
+```bash
+patchrail run --task-id <task_id> --runner auto
+patchrail verify --run-id <run_id> --command "pytest -q"
+patchrail list review-queue
+patchrail packet show --task-id <task_id>
+```
+
+Verification records store the command, working directory, exit code, elapsed time, stdout path, and stderr path under `.patchrail/`. Approval packets gather the task, Delivery Contract, plan, run, runner assignment, artifact bundle, verification results, review verdict, approval decision, and unresolved gaps into Markdown or JSON.
+
+The planning layer remains structured around two onboarding passes:
 
 - `machine/runtime onboarding`: select the provider set, access modes, and workflow backend that this machine can supervise safely
-- `project/planning onboarding`: define the task, `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and then generate the canonical plan
+- `project/planning onboarding`: define the task, Delivery Contract prompts, `Future Completion Brief`, `Ontology Brief`, `Product Brief`, and then generate the canonical plan
 
-The brief sequence is intentionally ordered:
+The public concept is the Delivery Contract. The stored compatibility model is still called `brief`, and the sequence is intentionally ordered:
 
 1. `Future Completion Brief` / prediction layer: describe what should be true in the future, the invariants that must hold, the failure conditions, and the non-goals.
 2. `Ontology Brief` / reality-boundary layer: define what exists, what does not exist, who owns what, and where approval or artifact boundaries sit.
 3. `Product Brief` / post-implementation acceptance layer: define the user problem, the MVP boundary, and what must be true after implementation for users and operators.
 4. `Plan` / execution-translation layer: convert those constraints into executable implementation steps that Patchrail can supervise.
-5. `Harness` / post-implementation evidence layer: after executor run and before review, capture execution summary, diff summary, stdout/stderr, invocation, runner trace, and artifact metadata.
+5. `Verification` / post-implementation evidence layer: after executor run and before review, capture command results, stdout/stderr paths, exit codes, elapsed time, runner trace, and artifact metadata.
 
 Patchrail continues to own the canonical `Task`, `Plan`, `Run`, `ReviewResult`, `ApprovalRecord`, ledgers, and artifact bundles. The future, ontology, and product briefs are plan-scoped companion artifacts or metadata, not a second canonical state machine.
 
-The first local path for that layer is available through:
+The first local path for that contract layer is available through:
 
 ```bash
 patchrail brief create --task-id <task_id> --kind future --file future.md
@@ -105,7 +115,16 @@ The goal is triangulated planning with explicit traces, not generic multi-model 
 
 ## Install CLI
 
-From the repository root:
+Public install:
+
+```bash
+brew install pipx
+pipx ensurepath
+pipx install patchrail
+patchrail --help
+```
+
+From a source checkout:
 
 ```bash
 cd /path/to/Patchrail
@@ -124,24 +143,27 @@ cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 ```
 
-The `patchrail` command is exposed through the package entrypoint. `scripts/install_cli.sh` only installs that entrypoint via `pipx`. If your default `python3` is older than 3.12, pass an explicit interpreter path such as `--python /opt/homebrew/bin/python3.13`.
+The `patchrail` command is exposed through the package entrypoint. Public users can install it with `pipx install patchrail`; source checkout users can run `scripts/install_cli.sh` for an editable install. If your default `python3` is older than 3.12, pass an explicit interpreter path such as `--python /opt/homebrew/bin/python3.13`.
 
 Patchrail defaults to human-readable CLI output. Use `patchrail --json ...` only for automation and scripting.
 
-`patchrail setup` is the first-run CLI path. It bootstraps runtime config, runs role preflight checks, and returns concrete next commands. Use `patchrail setup project --title ... --description ...` to create a task plus editable planning brief scaffolds. Edit those files, persist them with `patchrail brief create ...`, and only then create the canonical plan.
+`patchrail setup` is the first-run CLI path. It bootstraps runtime config, runs role preflight checks, and returns concrete next commands. Use `patchrail setup project --guided --title ... --description ...` to create a task plus editable Delivery Contract scaffolds. Edit those files, persist them with `patchrail brief create ...`, and only then create the canonical plan.
 
 ## Quickstart
 
 ```bash
 cd /path/to/Patchrail
-sh scripts/install_cli.sh --python "$(command -v python3.13)"
+pipx install patchrail
 patchrail setup
-patchrail setup project --title "First task" --description "Describe the supervised work"
+patchrail setup project --guided --title "First task" --description "Describe the supervised work"
 # edit the generated future/ontology/product files, then persist each edited brief
 patchrail brief create --task-id <task_id> --kind future --file <future_brief_file>
 patchrail brief create --task-id <task_id> --kind ontology --file <ontology_brief_file>
 patchrail brief create --task-id <task_id> --kind product --file <product_brief_file>
 patchrail plan --task-id <task_id> --auto
+patchrail run --task-id <task_id> --runner auto
+patchrail verify --run-id <run_id> --command "pytest -q"
+patchrail packet show --task-id <task_id>
 ```
 
 `patchrail start` opens the interactive shell in TTY sessions. Use `patchrail start --once` to render the home screen and exit immediately.
@@ -239,6 +261,8 @@ patchrail list plans
 patchrail list runs
 patchrail list reviews
 patchrail list approvals
+patchrail list verifications --task-id <task_id>
+patchrail list review-queue
 patchrail list fallback-requests
 patchrail list preflight-snapshots
 patchrail list artifact-bundles --has-trace

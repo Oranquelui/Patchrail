@@ -33,12 +33,14 @@ from patchrail.models.entities import (
     serialize,
 )
 from patchrail.models.roles import AccessMode, Provider, Role
+from patchrail.packet.service import ApprovalPacketService
 from patchrail.review.service import ReviewService
 from patchrail.runners.api import build_api_runner
 from patchrail.runners.subscription import build_subscription_runner
 from patchrail.runners.stub import build_runner
 from patchrail.storage.config_store import ConfigStore
 from patchrail.storage.filesystem import FilesystemStore
+from patchrail.verification.service import VerificationService
 from patchrail.workflows import WorkflowEngine, build_workflow_engine
 
 _BRIEF_KIND_ORDER = {
@@ -57,6 +59,8 @@ class PatchrailApp:
         self.review = ReviewService(store)
         self.approval = ApprovalService(store)
         self.fallback_approval = FallbackApprovalService(store)
+        self.verification = VerificationService(store)
+        self.packet = ApprovalPacketService(store)
         self._workflow_engine_instance: WorkflowEngine | None = None
 
     @classmethod
@@ -140,6 +144,7 @@ class PatchrailApp:
         reset: bool = False,
         quick: bool = False,
         non_interactive: bool = False,
+        guided: bool = False,
     ) -> dict[str, Any]:
         if scope == "runtime":
             return self._setup_runtime(
@@ -160,6 +165,7 @@ class PatchrailApp:
                 reset=reset,
                 quick=quick,
                 non_interactive=non_interactive,
+                guided=guided,
             )
         raise PatchrailError(f"Unknown setup scope '{scope}'.")
 
@@ -247,7 +253,7 @@ class PatchrailApp:
                 "quick": quick,
                 "non_interactive": non_interactive,
                 "next_steps": [
-                    'patchrail setup project --title "First task" --description "Describe the supervised work"',
+                    'patchrail setup project --guided --title "First task" --description "Describe the supervised work"',
                     "patchrail doctor",
                     "sh scripts/local_smoke_test.sh",
                 ],
@@ -265,6 +271,7 @@ class PatchrailApp:
         reset: bool,
         quick: bool,
         non_interactive: bool,
+        guided: bool,
     ) -> dict[str, Any]:
         runtime_payload = self._setup_runtime(
             preset=preset,
@@ -287,7 +294,7 @@ class PatchrailApp:
             template_path = brief_directory / f"{task.id}-{kind.value}.md"
             template_paths[kind.value] = str(template_path)
             if not template_path.exists():
-                template_path.write_text(self._brief_template(kind=kind, task=task))
+                template_path.write_text(self._brief_template(kind=kind, task=task, guided=guided))
 
         return {
             "setup": {
@@ -299,6 +306,7 @@ class PatchrailApp:
                 "brief_files": template_paths,
                 "quick": quick,
                 "non_interactive": non_interactive,
+                "guided": guided,
                 "next_steps": [
                     f"Edit the generated brief files under {brief_directory}",
                     f"patchrail brief create --task-id {task.id} --kind future --file {template_paths['future']}",
@@ -662,6 +670,37 @@ class PatchrailApp:
         self.store.load_run(run_id)
         return {"artifact_bundle": serialize(self.artifacts.get_bundle(run_id))}
 
+    def verify_run(self, run_id: str, command: str) -> dict[str, Any]:
+        verification = self.verification.run_verification(run_id=run_id, command=command)
+        self._append_trace(
+            verification.task_id,
+            "run.verified",
+            f"Recorded verification {verification.id} for run {verification.run_id}.",
+            metadata={
+                "verification_id": verification.id,
+                "run_id": verification.run_id,
+                "command": verification.command,
+                "exit_code": verification.exit_code,
+                "status": verification.status.value,
+            },
+        )
+        return {"verification": serialize(verification)}
+
+    def list_verifications(self, task_id: str | None = None, run_id: str | None = None) -> dict[str, Any]:
+        return {
+            "verifications": serialize(
+                self.verification.list_verifications(task_id=task_id, run_id=run_id)
+            )
+        }
+
+    def show_packet(self, task_id: str, output_format: str) -> dict[str, Any]:
+        packet = self.packet.build_packet(task_id)
+        content = self.packet.render_json(packet) if output_format == "json" else self.packet.render_markdown(packet)
+        return {"packet": packet, "content": content, "format": output_format}
+
+    def export_packet(self, task_id: str, output_path: str, output_format: str) -> dict[str, Any]:
+        return self.packet.export_packet(task_id=task_id, output_path=output_path, output_format=output_format)
+
     def list_tasks(self) -> dict[str, Any]:
         return {"tasks": serialize(self.store.list_tasks())}
 
@@ -724,6 +763,36 @@ class PatchrailApp:
             ]
         return {"artifact_bundles": serialize(bundles)}
 
+    def list_review_queue(self) -> dict[str, Any]:
+        groups: dict[str, list[Any]] = {
+            "needs_verification": [],
+            "failed_verification": [],
+            "ready_for_review": [],
+            "awaiting_approval": [],
+            "approved": [],
+        }
+        verifications_by_run: dict[str, list[Any]] = {}
+        for verification in self.store.list_verifications():
+            verifications_by_run.setdefault(verification.run_id, []).append(verification)
+
+        for task in self.store.list_tasks():
+            if task.state == TaskState.APPROVED:
+                groups["approved"].append(task)
+                continue
+            if task.state == TaskState.AWAITING_APPROVAL:
+                groups["awaiting_approval"].append(task)
+                continue
+            if task.state != TaskState.REVIEW_PENDING or task.latest_run_id is None:
+                continue
+            latest_verification = (verifications_by_run.get(task.latest_run_id) or [None])[0]
+            if latest_verification is None:
+                groups["needs_verification"].append(task)
+            elif latest_verification.status.value == "failed":
+                groups["failed_verification"].append(task)
+            else:
+                groups["ready_for_review"].append(task)
+        return {"review_queue": serialize(groups)}
+
     def _briefs_for_task(self, task_id: str) -> list[PlanningBrief]:
         briefs = [brief for brief in self.store.list_planning_briefs() if brief.task_id == task_id]
         return sorted(briefs, key=lambda brief: (_BRIEF_KIND_ORDER[brief.kind], brief.created_at))
@@ -738,7 +807,7 @@ class PatchrailApp:
     def _merge_brief_reference(self, existing: list[Any], brief: PlanningBrief) -> list[Any]:
         return [reference for reference in existing if reference.id != brief.id] + [brief.to_reference()]
 
-    def _brief_template(self, kind: BriefKind, task: Task) -> str:
+    def _brief_template(self, kind: BriefKind, task: Task, guided: bool = False) -> str:
         spec = PLANNING_LAYER_BY_KIND[kind.value]
         lines = [
             f"# {spec.title}",
@@ -756,7 +825,38 @@ class PatchrailApp:
         ]
         for heading in spec.headings:
             lines.extend([f"## {heading}", "", "- TBD", ""])
+        if guided:
+            lines.extend(self._guided_contract_prompts(kind))
         return "\n".join(lines)
+
+    def _guided_contract_prompts(self, kind: BriefKind) -> list[str]:
+        prompts_by_kind = {
+            BriefKind.FUTURE: [
+                "## Delivery Contract Prompts",
+                "",
+                "- What exact future state should the AI-coded change produce?",
+                "- Which observable behavior proves the change is complete?",
+                "- What must remain unchanged even if the agent finds adjacent work?",
+                "",
+            ],
+            BriefKind.ONTOLOGY: [
+                "## Delivery Contract Prompts",
+                "",
+                "- What business or product rule would make a passing test still wrong?",
+                "- Which entities, owners, credentials, or external systems are real boundaries?",
+                "- What must the agent not invent, rename, migrate, delete, or broaden?",
+                "",
+            ],
+            BriefKind.PRODUCT: [
+                "## Delivery Contract Prompts",
+                "",
+                "- What evidence must the approval packet show before a human can approve?",
+                "- Which tests, commands, screenshots, or logs should Patchrail verification capture?",
+                "- What user-visible outcome or operator workflow must be checked after implementation?",
+                "",
+            ],
+        }
+        return prompts_by_kind[kind]
 
     def _append_trace(
         self,

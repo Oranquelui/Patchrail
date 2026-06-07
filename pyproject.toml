@@ -1,17 +1,27 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "patchrail"
-version = "0.1.0"
-description = "Local-first supervised coding-agent control plane"
+version = "0.2.0"
+description = "Local verification and approval packets for AI coding agent work"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Patchrail" }]
-license = { text = "MIT" }
-classifiers = ["License :: OSI Approved :: MIT License"]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["ai-coding", "verification", "approval", "coding-agents", "cli"]
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/louistoyozaki/Patchrail"
+Documentation = "https://github.com/louistoyozaki/Patchrail#readme"
 
 [project.optional-dependencies]
 langgraph = ["langgraph"]
@@ -21,7 +31,6 @@ patchrail = "patchrail.cli.main:run"
 
 [tool.setuptools]
 include-package-data = false
-license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 include = ["patchrail*"]

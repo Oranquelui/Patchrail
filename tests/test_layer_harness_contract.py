@@ -76,6 +76,36 @@ def test_setup_project_templates_embed_layer_purpose_and_timing(
     assert "Timing: define before implementation; verify after implementation" in templates["product"]
 
 
+def test_setup_project_guided_templates_frame_briefs_as_delivery_contract(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    patchrail_home = tmp_path / ".patchrail"
+    monkeypatch.setenv("PATCHRAIL_HOME", str(patchrail_home))
+
+    exit_code, payload = run_cli(
+        [
+            "setup",
+            "project",
+            "--title",
+            "Review bottleneck",
+            "--description",
+            "Make AI generated changes easier to verify",
+            "--guided",
+        ],
+        capsys,
+    )
+
+    assert exit_code == 0
+    templates = {kind: Path(path).read_text() for kind, path in payload["setup"]["brief_files"].items()}
+    assert "Delivery Contract" in templates["future"]
+    assert "What exact future state should the AI-coded change produce?" in templates["future"]
+    assert "What business or product rule would make a passing test still wrong?" in templates["ontology"]
+    assert "What evidence must the approval packet show before a human can approve?" in templates["product"]
+    assert payload["setup"]["guided"] is True
+
+
 def test_local_harness_trace_declares_harness_contract(tmp_path: Path) -> None:
     task_file = tmp_path / "task.json"
     plan_file = tmp_path / "plan.json"
