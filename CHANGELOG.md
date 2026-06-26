@@ -19,6 +19,7 @@ Direction-setting alpha release for AI coding verification, approval packets, an
 - Release check script for build, isolated wheel install, CLI help, and local smoke verification.
 - Local smoke coverage that creates all three briefs, validates them, executes the local harness, records verification evidence, exports an approval packet, reviews, and records human approval.
 - First public `patchrail-supervise` Agent Skill scaffold for Codex, Claude Code, Grok Build, and compatible agents.
+- Approval-fatigue research note grounding the next `ApprovalProfile v1`, `RunLedger v1`, and skill-first delegation direction.
 
 ### Changed
 

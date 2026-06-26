@@ -12,6 +12,12 @@ Patchrail is not trying to make humans approve every tool call. That pattern cre
 
 `ApprovalProfile v1` and `RunLedger v1` are next implementation targets, not completed runtime features in this alpha.
 
+## Research Basis
+
+The next direction was adjusted after reviewing current coding-agent permission and human-in-the-loop feedback from Anthropic, OpenAI Codex discussions/issues, Claude Code issues, Kilo Code, LangChain4j, LlamaIndex, and agentic code-review commentary. The consistent signal is that repeated manual prompts become approval fatigue, while fully bypassing permissions creates an unacceptable blast radius. Patchrail should therefore move toward policy-first, risk-aware delegation: define the scope once, let low-risk work proceed inside that profile, preserve evidence, and escalate only when a boundary is crossed.
+
+The source summary is tracked in [Approval Fatigue Research](../reports/research/2026-06-26-approval-fatigue.md).
+
 ## Target In Scope
 
 - CLI commands for setup bootstrap, config bootstrap, preflight inspection, task creation, Delivery Contract scaffolding through existing planning brief storage, planning, execution, verification, packet export, review-queue listing, status, review, approval, rejection, logs, and artifact lookup.

@@ -106,6 +106,8 @@ The next direction is:
 
 Skill instructions are not the enforcement layer. Enforcement must come from host-agent permissions, sandbox settings, Patchrail policy records, hooks where available, and local evidence.
 
+The direction is based on current coding-agent permission and human-in-the-loop feedback summarized in the [approval fatigue research note](reports/research/2026-06-26-approval-fatigue.md).
+
 ## Quickstart
 
 From the repository root:
@@ -208,6 +210,7 @@ patchrail --json status --task-id <task_id>
 - [Resume Positioning](docs/resume-positioning.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
+- [Approval Fatigue Research](reports/research/2026-06-26-approval-fatigue.md)
 - [Changelog](CHANGELOG.md)
 - [Agents Contract](AGENTS.md)
 - [Japanese README](README.ja.md)

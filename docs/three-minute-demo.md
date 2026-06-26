@@ -70,4 +70,4 @@ patchrail verify --run-id <run_id> --command "python -c 'print(\"verification ok
 - State discipline: verification is intentionally stored as evidence without changing the canonical lifecycle yet.
 - Local-first architecture: every record is readable under `.patchrail/`.
 - Safety boundary: human approval remains explicit even when an agent and verification both succeed.
-- Distribution readiness: package metadata, `pipx install patchrail` docs, smoke tests, and release checks are part of the project.
+- Distribution readiness: package metadata, pipx-based local install docs, smoke tests, wheel checks, and release checks are part of the project.

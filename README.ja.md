@@ -1,6 +1,6 @@
 # Patchrail
 
-Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現在の alpha は、`task -> plan -> run -> review -> approval` の状態遷移、planning brief、runner contract、evidence bundle、artifact metadata、decision trace、fallback approval、approval ledger をローカルに残します。次の方向性は skill-first / CLI-backed です。Codex、Claude Code、Grok Build などの coding agent から reusable skill として監督ワークフローを呼び出し、`patchrail` CLI / headless core が durable な状態を保持する形に寄せます。
+Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現在の alpha は、`task -> plan -> run -> verify -> review -> approval` の状態遷移、planning brief、runner contract、evidence bundle、verification record、review queue、approval packet、decision trace、fallback approval、approval ledger をローカルに残します。次の方向性は skill-first / CLI-backed です。Codex、Claude Code、Grok Build などの coding agent から reusable skill として監督ワークフローを呼び出し、`patchrail` CLI / headless core が durable な状態を保持する形に寄せます。
 
 ![Patchrail terminal loading screen](patchrail-start.jpg)
 
@@ -15,7 +15,7 @@ Patchrail は、coding agent を「速く動かす」ためだけの launcher �
 中心にある chain は次です。
 
 ```text
-human intent -> planning briefs -> plan snapshot -> runner execution -> evidence bundle -> review -> approval
+human intent -> planning briefs -> plan snapshot -> runner execution -> verification evidence -> review -> approval packet
 ```
 
 coding agent は、曖昧な指示からでも短時間で repository を変更できます。しかし、業務や顧客環境では「何を正しい完了状態とみなしたのか」「どの境界を越えてはいけなかったのか」「実際に runner が何をしたのか」「なぜ人間が承認したのか」が残っていなければ、安全に導入できません。
@@ -50,8 +50,9 @@ Patchrail は、顧客・クライアントのリポジトリに AI coding agent
 3. brief sequence を validate し、それらの brief を参照する canonical plan を保存する。
 4. Runner Contract v1 の handoff を確認する。
 5. 明示的な runner assignment のもとで executor を実行する。
-6. final approval の前に Evidence Bundle v1 の artifacts をレビューする。
-7. human approval decision と ledger をローカルに残す。
+6. operator が選んだ検証コマンドを実行し、stdout / stderr / exit code / elapsed time を保存する。
+7. final approval の前に Evidence Bundle v1 と approval packet をレビューする。
+8. human approval decision と ledger をローカルに残す。
 
 目的は agent を最初から自律実行させることではありません。人間の意図、agent実行、レビュー証跡、最終承認の受け渡しを、あとからディスク上で確認できるようにすることです。
 
@@ -69,11 +70,14 @@ Layer構造は次の意味に固定しています。
 
 ## 現在のリリース
 
-`v0.2.0-alpha.1` は、`v0.1.0` 以降の開発内容を3つの local contract として整理した alpha release です。
+`v0.2.0-alpha.1` は、`v0.1.0` 以降の開発内容を local contract、verification evidence、approval packet として整理した alpha release です。
 
 - Brief Schema v1: `future`, `ontology`, `product` brief が `schema_version=patchrail.brief_schema.v1` を持ち、plan snapshot にも保存されます。
 - Runner Contract v1: shell-backed runner への workspace / environment handoff を `patchrail contracts runner` で確認できます。
 - Evidence Bundle v1: run artifacts が `schema_version=patchrail.evidence_bundle.v1`、manifest metadata、runner trace、runner-local artifact collection を持ちます。
+- Verification record: `patchrail verify` が検証コマンド、cwd、exit code、elapsed time、stdout / stderr path を run に紐付けて保存します。
+- Approval packet: `patchrail packet show|export` が既存の local record から Markdown / JSON のレビュー用 packet を生成します。
+- Review queue: `patchrail list review-queue` が検証・レビュー・承認の readiness を一覧化します。
 
 ## 次の方向性
 
@@ -84,6 +88,8 @@ Layer構造は次の意味に固定しています。
 - `patchrail-supervise`: Codex、Claude Code、Grok Build などで使える portable Agent Skill scaffold を検証・強化する。
 
 Skill の指示だけを enforcement layer とはみなしません。実際の安全境界は host agent の permission / sandbox、Patchrail policy record、hook、local evidence で支えます。
+
+この方向性は、coding-agent の permission prompt / human-in-the-loop に関する公開フィードバックを整理した [approval fatigue research note](reports/research/2026-06-26-approval-fatigue.md) に基づいています。
 
 公開向けの説明例は [Supervised Agent Rollout](docs/case-studies/supervised-agent-rollout.md) にあります。
 
@@ -118,6 +124,13 @@ patchrail setup project --title "First task" --description "Describe the supervi
 patchrail brief create --task-id <task_id> --kind future --file <future_brief_file>
 patchrail brief create --task-id <task_id> --kind ontology --file <ontology_brief_file>
 patchrail brief create --task-id <task_id> --kind product --file <product_brief_file>
+patchrail brief validate --task-id <task_id>
+patchrail plan --task-id <task_id> --auto
+patchrail run --task-id <task_id> --runner auto
+patchrail verify --run-id <run_id> --command "pytest -q"
+patchrail list review-queue
+patchrail packet show --task-id <task_id>
+patchrail packet export --task-id <task_id> --output approval-packet.md
 patchrail start
 patchrail start --once
 patchrail config init --workflow-backend langgraph
@@ -226,8 +239,11 @@ cross-provider または cross-access-mode の fallback が必要になった場
 - [Evidence Bundle v1](docs/contracts/evidence-bundle-v1.md)
 - [Patchrail Supervise Skill](skills/patchrail-supervise/SKILL.md)
 - [MVP](docs/mvp.md)
+- [3-Minute Demo](docs/three-minute-demo.md)
+- [Resume Positioning](docs/resume-positioning.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)
+- [Approval Fatigue Research](reports/research/2026-06-26-approval-fatigue.md)
 - [Changelog](CHANGELOG.md)
 - [Agents Contract](AGENTS.md)
 

@@ -6,7 +6,7 @@ Patchrail は、Claude / Codex / Cursor などの AI コーディングワーク
 
 ## 職務経歴書向け要約
 
-AI コーディングエージェントの実行結果を監査可能にする local-first CLI「Patchrail」を個人開発。タスク、計画、実行、検証、レビュー、承認を明示的なローカルレコードとして保存し、`patchrail verify` による検証コマンド実行結果と `patchrail packet` による承認用 Markdown / JSON パケット生成を実装。CLI 設計、状態遷移、ファイル永続化、テスト、PyPI 配布準備まで一貫して担当。
+AI コーディングエージェントの実行結果を監査可能にする local-first CLI「Patchrail」を個人開発。タスク、計画、実行、検証、レビュー、承認を明示的なローカルレコードとして保存し、`patchrail verify` による検証コマンド実行結果と `patchrail packet` による承認用 Markdown / JSON パケット生成を実装。CLI 設計、状態遷移、ファイル永続化、テスト、wheel build / CLI 配布準備まで一貫して担当。
 
 ## 技術的に話すポイント
 
@@ -30,4 +30,4 @@ Patchrail で一番重視したのは、「AI にもっとコードを書かせ�
 
 ## 短い職務経歴書用文面
 
-AI コーディングエージェントの実行結果を検証・承認可能にする local-first CLI「Patchrail」を設計・実装。`patchrail verify` で検証コマンドの stdout / stderr / exit code / elapsed time を保存し、`patchrail packet` でタスク、計画、実行、成果物、検証、レビュー、承認をまとめた approval packet を生成。状態遷移設計、ファイル永続化、CLI UX、テスト、PyPI 配布準備まで担当。
+AI コーディングエージェントの実行結果を検証・承認可能にする local-first CLI「Patchrail」を設計・実装。`patchrail verify` で検証コマンドの stdout / stderr / exit code / elapsed time を保存し、`patchrail packet` でタスク、計画、実行、成果物、検証、レビュー、承認をまとめた approval packet を生成。状態遷移設計、ファイル永続化、CLI UX、テスト、wheel build / CLI 配布準備まで担当。
