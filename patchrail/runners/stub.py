@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from patchrail.core.exceptions import PatchrailError
+from patchrail.core.layers import RUNNER_CONTRACT
 from patchrail.models.entities import CostMetrics, Plan, Task
 from patchrail.runners.base import Runner, RunnerResult
 
@@ -86,6 +87,9 @@ class ShellConfiguredRunner(Runner):
 
     def run(self, task: Task, plan: Plan, workspace_path: Path, run_id: str) -> RunnerResult:
         output_path = workspace_path / "output.json"
+        artifact_dir = workspace_path / "artifacts"
+        trace_path = workspace_path / "trace.json"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         project_root = Path(__file__).resolve().parents[2]
         python_path = env.get("PYTHONPATH")
@@ -94,11 +98,15 @@ class ShellConfiguredRunner(Runner):
         )
         env.update(
             {
+                "PATCHRAIL_RUNNER_CONTRACT_SCHEMA_VERSION": RUNNER_CONTRACT.schema_version,
                 "PATCHRAIL_RUN_ID": run_id,
                 "PATCHRAIL_RUNNER_NAME": self.name,
+                "PATCHRAIL_WORKSPACE": str(workspace_path),
                 "PATCHRAIL_TASK_FILE": str(workspace_path / "task.json"),
                 "PATCHRAIL_PLAN_FILE": str(workspace_path / "plan.json"),
                 "PATCHRAIL_OUTPUT_FILE": str(output_path),
+                "PATCHRAIL_ARTIFACT_DIR": str(artifact_dir),
+                "PATCHRAIL_TRACE_FILE": str(trace_path),
             }
         )
         completed = subprocess.run(

@@ -1,6 +1,6 @@
 # Patchrail
 
-Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現段階では CLI と headless core に絞り、`task -> plan -> run -> review -> approval` の状態遷移、artifact bundle、decision trace、approval ledger をローカルに残します。現在は `planner / reviewer / executor` に対して `provider × access_mode(api|subscription)` の候補集合を持ち、各フェーズ開始時に preflight と policy 解決を行って concrete assignment を固定保存します。
+Patchrail は、ローカルファーストで supervised な coding-agent control plane です。現在の alpha は、`task -> plan -> run -> review -> approval` の状態遷移、planning brief、runner contract、evidence bundle、artifact metadata、decision trace、fallback approval、approval ledger をローカルに残します。次の方向性は skill-first / CLI-backed です。Codex、Claude Code、Grok Build などの coding agent から reusable skill として監督ワークフローを呼び出し、`patchrail` CLI / headless core が durable な状態を保持する形に寄せます。
 
 ![Patchrail terminal loading screen](patchrail-start.jpg)
 
@@ -15,12 +15,12 @@ Patchrail は、coding agent を「速く動かす」ためだけの launcher �
 中心にある chain は次です。
 
 ```text
-human intent -> planning briefs -> plan snapshot -> runner execution -> harness evidence -> review -> approval
+human intent -> planning briefs -> plan snapshot -> runner execution -> evidence bundle -> review -> approval
 ```
 
 coding agent は、曖昧な指示からでも短時間で repository を変更できます。しかし、業務や顧客環境では「何を正しい完了状態とみなしたのか」「どの境界を越えてはいけなかったのか」「実際に runner が何をしたのか」「なぜ人間が承認したのか」が残っていなければ、安全に導入できません。
 
-そのため Patchrail は dashboard-first ではなく、CLI-first / headless-core-first で作っています。最初に必要なのは見た目ではなく、diff でき、test でき、review でき、ローカルに残る canonical record です。
+そのため Patchrail は dashboard-first ではなく、CLI-first / headless-core-first で作ります。最初に必要なのは見た目ではなく、diff でき、test でき、review でき、ローカルに残る canonical record です。次の方向性では、人間に毎回 approve ボタンを押させるのではなく、最初に scope と approval profile を決め、低リスク作業は自動で進め、境界を越える時だけ escalation する形に進めます。
 
 ## なぜ必要か
 
@@ -31,15 +31,15 @@ coding agent は、曖昧な指示からでも短時間で repository を変更�
 - final diff の review だけでは、executor が最初の product / ontology / approval boundary の内側に留まったかを復元できません。
 - dashboard は整理されているように見えますが、canonical state、証跡、最終承認を誰が所有しているかを曖昧にすることがあります。
 
-Patchrail はこの問題を、5つの責務に分けて扱います。
+Patchrail はこの問題を、現時点では5つの責務に分けて扱います。
 
 1. 実装前に、未来に成立しているべき状態を予測する。
 2. 実装前に、現実の ontology と承認境界を定義する。
 3. 実装前に、実装後の acceptance criteria を定義する。
 4. runner 実行前に、それらを canonical plan へ snapshot する。
-5. review / approval 前に、実装後の証跡を harness / artifact bundle として捕獲する。
+5. review / approval 前に、実装後の証跡を artifact bundle として捕獲する。
 
-つまり Patchrail は autonomous agent を無制限に走らせる道具ではなく、人間の判断と agent 実行の受け渡しを明示する supervision rail です。
+つまり Patchrail は autonomous agent を無制限に走らせる道具でも、承認ボタンを増やす道具でもありません。人間の判断を scope、evidence、review、final approval に変換する supervision rail です。
 
 ## 3分で見せるポイント
 
@@ -47,10 +47,11 @@ Patchrail は、顧客・クライアントのリポジトリに AI coding agent
 
 1. 監督対象の task を作る。
 2. 実装前に future / ontology / product brief を添付する。
-3. それらの brief を参照する canonical plan を保存する。
-4. 明示的な runner assignment のもとで executor を実行する。
-5. final approval の前に run artifacts をレビューする。
-6. human approval decision と ledger をローカルに残す。
+3. brief sequence を validate し、それらの brief を参照する canonical plan を保存する。
+4. Runner Contract v1 の handoff を確認する。
+5. 明示的な runner assignment のもとで executor を実行する。
+6. final approval の前に Evidence Bundle v1 の artifacts をレビューする。
+7. human approval decision と ledger をローカルに残す。
 
 目的は agent を最初から自律実行させることではありません。人間の意図、agent実行、レビュー証跡、最終承認の受け渡しを、あとからディスク上で確認できるようにすることです。
 
@@ -64,7 +65,25 @@ Layer構造は次の意味に固定しています。
 | Execution translation | Plan | run前 | 上3つを実行手順に変換し、brief参照をimmutableにsnapshotする。 |
 | Post-implementation evidence | Harness / ArtifactBundle | executor実行後、review前 | 実装後の証跡として execution summary, diff, stdout/stderr, invocation, runner trace, artifact metadata を捕獲する。 |
 
-短く言うと、Future は予測、Product は実装後の成立条件、Harness は実装後の証跡捕獲です。
+短く言うと、Future は予測、Product は実装後の成立条件、Harness / ArtifactBundle は実装後の証跡捕獲です。
+
+## 現在のリリース
+
+`v0.2.0-alpha.1` は、`v0.1.0` 以降の開発内容を3つの local contract として整理した alpha release です。
+
+- Brief Schema v1: `future`, `ontology`, `product` brief が `schema_version=patchrail.brief_schema.v1` を持ち、plan snapshot にも保存されます。
+- Runner Contract v1: shell-backed runner への workspace / environment handoff を `patchrail contracts runner` で確認できます。
+- Evidence Bundle v1: run artifacts が `schema_version=patchrail.evidence_bundle.v1`、manifest metadata、runner trace、runner-local artifact collection を持ちます。
+
+## 次の方向性
+
+次の release line では、approval fatigue を減らすために、毎回 approve ボタンを押す運用ではなく、最初に policy を決め、低リスク作業はその範囲で進め、境界を越える時だけ escalation する形に寄せます。
+
+- `ApprovalProfile v1`: local coding-agent work を `auto`, `ask`, `deny` に分ける。
+- `RunLedger v1`: effective profile、auto-approved action、escalation、denial、receipt、rollback note を記録する。
+- `patchrail-supervise`: Codex、Claude Code、Grok Build などで使える portable Agent Skill scaffold を検証・強化する。
+
+Skill の指示だけを enforcement layer とはみなしません。実際の安全境界は host agent の permission / sandbox、Patchrail policy record、hook、local evidence で支えます。
 
 公開向けの説明例は [Supervised Agent Rollout](docs/case-studies/supervised-agent-rollout.md) にあります。
 
@@ -202,6 +221,10 @@ cross-provider または cross-access-mode の fallback が必要になった場
 ## Docs
 
 - [Architecture](docs/architecture.md)
+- [Brief Schema v1](docs/contracts/brief-schema-v1.md)
+- [Runner Contract v1](docs/contracts/runner-contract-v1.md)
+- [Evidence Bundle v1](docs/contracts/evidence-bundle-v1.md)
+- [Patchrail Supervise Skill](skills/patchrail-supervise/SKILL.md)
 - [MVP](docs/mvp.md)
 - [Local Testing](docs/local-testing.md)
 - [Backlog](docs/backlog.md)

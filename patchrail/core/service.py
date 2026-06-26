@@ -11,7 +11,7 @@ from patchrail.core.assignment import resolve_role_assignment
 from patchrail.artifacts.service import ArtifactService
 from patchrail.core.exceptions import PatchrailError
 from patchrail.core.hooks import HookEvent, HookRegistry
-from patchrail.core.layers import PLANNING_LAYER_BY_KIND
+from patchrail.core.layers import BRIEF_SCHEMA_CONTRACT, PLANNING_LAYER_BY_KIND, RUNNER_CONTRACT
 from patchrail.core.ids import generate_id, utc_now
 from patchrail.core.state_machine import require_state, transition_task
 from patchrail.models.entities import (
@@ -99,6 +99,7 @@ class PatchrailApp:
             id=brief_id,
             task_id=task.id,
             kind=kind,
+            schema_version=BRIEF_SCHEMA_CONTRACT.schema_version,
             source_path=str(source_path),
             storage_path=str(self.store.brief_path(brief_id)),
             content=content,
@@ -127,6 +128,32 @@ class PatchrailApp:
 
     def show_brief(self, brief_id: str) -> dict[str, Any]:
         return {"brief": serialize(self.store.load_planning_brief(brief_id))}
+
+    def validate_briefs(self, task_id: str) -> dict[str, Any]:
+        task = self.store.load_task(task_id)
+        briefs = self._briefs_for_task(task.id)
+        required_kinds = BRIEF_SCHEMA_CONTRACT.required_kinds
+        present_kinds = [kind for kind in required_kinds if any(brief.kind.value == kind for brief in briefs)]
+        missing_kinds = [kind for kind in required_kinds if kind not in present_kinds]
+        return {
+            "brief_validation": {
+                "task_id": task.id,
+                "schema_version": BRIEF_SCHEMA_CONTRACT.schema_version,
+                "valid": not missing_kinds,
+                "required_kinds": required_kinds,
+                "present_kinds": present_kinds,
+                "missing_kinds": missing_kinds,
+                "briefs": [
+                    {
+                        "id": brief.id,
+                        "kind": brief.kind.value,
+                        "schema_version": brief.schema_version,
+                        "attached_plan_id": brief.attached_plan_id,
+                    }
+                    for brief in briefs
+                ],
+            }
+        }
 
     def setup(
         self,
@@ -221,6 +248,9 @@ class PatchrailApp:
             "sh scripts/local_smoke_test.sh",
         ]
         return {"doctor": payload}
+
+    def get_runner_contract(self) -> dict[str, Any]:
+        return {"runner_contract": RUNNER_CONTRACT.to_dict()}
 
     def _setup_runtime(
         self,
@@ -467,6 +497,9 @@ class PatchrailApp:
             "task_file": str(workspace_path / "task.json"),
             "plan_file": str(workspace_path / "plan.json"),
             "output_file": str(workspace_path / "output.json"),
+            "artifact_dir": str(workspace_path / "artifacts"),
+            "trace_file": str(workspace_path / "trace.json"),
+            "runner_contract_schema_version": RUNNER_CONTRACT.schema_version,
             "exit_code": result.exit_code,
         }
         bundle = self.artifacts.create_bundle(
@@ -477,6 +510,7 @@ class PatchrailApp:
             stderr=result.stderr,
             invocation=invocation,
             runner_trace=result.runner_trace,
+            runner_artifact_dir=workspace_path / "artifacts",
         )
         run = Run(
             id=run_id,
@@ -746,6 +780,7 @@ class PatchrailApp:
             f"Task: {task.id}",
             f"Title: {task.title}",
             f"Layer: {spec.layer}",
+            f"Schema: {BRIEF_SCHEMA_CONTRACT.schema_version}",
             f"Question: {spec.question}",
             f"Timing: {spec.timing}",
             "",

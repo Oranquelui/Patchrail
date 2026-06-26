@@ -22,6 +22,7 @@ sh scripts/install_cli.sh --python "$(command -v python3.13)" --with-langgraph
 
 default output は人間向け summary です。machine-readable な JSON が必要な場合は `patchrail --json ...` を使います。`scripts/local_smoke_test.sh` は内部でこの mode を使います。
 `patchrail setup` は first-run 用の導線です。runtime config を作成し、preflight summary と次の具体コマンドを返します。`patchrail setup project --title ... --description ...` は task と `future / ontology / product` brief scaffold を作成します。
+生成された brief scaffold と `brief create` 後の `.patchrail/briefs/<brief_id>.json` には `patchrail.brief_schema.v1` が入ります。
 `patchrail start` は TTY では interactive shell に入り、`patchrail start --once` は splash を 1 回だけ描画します。
 
 ## Fastest Path
@@ -31,6 +32,7 @@ cd /path/to/Patchrail
 sh scripts/install_cli.sh --python "$(command -v python3.13)"
 patchrail setup
 patchrail setup project --title "First task" --description "Describe the supervised work"
+patchrail brief validate --task-id <task_id>
 patchrail start
 ```
 `patchrail start` に入った後は `doctor`, `list tasks`, `task create ...`, `status --task-id ...`, `exit` をそのまま打てます。slash shortcut は `/help`, `/doctor`, `/tasks`, `/start`, `/exit` を使えます。
@@ -42,6 +44,7 @@ patchrail config init --workflow-backend langgraph
 patchrail preflight --role planner
 patchrail preflight --role reviewer
 patchrail preflight --role executor --runner auto
+patchrail contracts runner
 
 # real preset
 patchrail config init --preset real --workflow-backend local
@@ -71,13 +74,17 @@ patchrail list approvals
 patchrail list fallback-requests
 patchrail list preflight-snapshots
 patchrail list artifact-bundles --has-trace
+patchrail brief validate --task-id <task_id>
+patchrail --json contracts runner
 patchrail --json status --task-id <task_id>
 ```
 
 `scripts/local_smoke_test.sh` は以下を自動で行う:
 - `config init`
 - `preflight`
-- `task create`
+- `setup project`
+- `brief create` for `future`, `ontology`, and `product`
+- `brief validate`
 - `plan`
 - `run --runner auto`
 - `review`
@@ -152,6 +159,9 @@ patchrail status --task-id <task_id>
 patchrail list artifact-bundles --task-id <task_id>
 patchrail list artifact-bundles --logical-kind runner_trace --has-trace
 ```
+JSON output for `status`, `artifacts`, and `list artifact-bundles` includes `schema_version=patchrail.evidence_bundle.v1` on each persisted evidence bundle.
+The local harness trace also includes `contract_runtime`, which records the observed Runner Contract v1 schema-version environment variable, workspace-relative handoff paths, and ready runner-writable paths. The same trace is mirrored to `.patchrail/workspaces/<run_id>/trace.json` before Patchrail persists it into the canonical evidence bundle.
+Runner-local artifacts written under `.patchrail/workspaces/<run_id>/artifacts/` are copied into `.patchrail/artifacts/<run_id>/runner-artifacts/` and exposed as `runner_artifact` manifest entries. The local harness smoke path writes `local-harness-report.json` so operators can verify the collection path without external runner dependencies.
 
 ## Manual Flow
 ```bash
@@ -237,6 +247,12 @@ sh scripts/local_smoke_test.sh
 - `.patchrail/config/role-policy.json`
 - `.patchrail/config/workflow-backend.json`
 - `.patchrail/artifacts/<run_id>/`
+- `.patchrail/artifacts/<run_id>/runner-artifacts/`
 - `.patchrail/artifacts/<run_id>/trace.json`
 - `.patchrail/workspaces/<run_id>/`
+- `.patchrail/workspaces/<run_id>/task.json`
+- `.patchrail/workspaces/<run_id>/plan.json`
+- `.patchrail/workspaces/<run_id>/output.json`
+- `.patchrail/workspaces/<run_id>/artifacts/`
+- `.patchrail/workspaces/<run_id>/trace.json`
 - `.patchrail/ledgers/`

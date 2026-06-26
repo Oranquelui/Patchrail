@@ -416,6 +416,7 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     assert workspace_path.exists()
     assert (workspace_path / "task.json").exists()
     assert (workspace_path / "plan.json").exists()
+    assert (workspace_path / "artifacts").is_dir()
 
     exit_code, reviewed = run_cli(
         ["review", "--run-id", run_id, "--verdict", "pass", "--summary", "Looks good"],
@@ -438,6 +439,7 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     assert status_payload["latest_review"]["id"] == review_id
     assert status_payload["latest_approval"]["id"] == approval_id
     assert status_payload["latest_artifact_bundle"]["run_id"] == run_id
+    assert status_payload["latest_artifact_bundle"]["schema_version"] == "patchrail.evidence_bundle.v1"
     assert status_payload["latest_artifact_bundle"]["artifacts"]["trace"]["logical_kind"] == "runner_trace"
 
     exit_code, logs_payload = run_cli(["logs", "--run-id", run_id], capsys)
@@ -449,6 +451,7 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     assert exit_code == 0
     bundle = artifacts_payload["artifact_bundle"]
     assert bundle["run_id"] == run_id
+    assert bundle["schema_version"] == "patchrail.evidence_bundle.v1"
     artifact_paths = {name: Path(path) for name, path in bundle["files"].items()}
     for path in artifact_paths.values():
         assert path.exists()
@@ -468,6 +471,9 @@ def test_happy_path_persists_state_artifacts_and_ledgers(
     assert invocation["mode"] == "shell"
     assert "patchrail.runners.local_harness" in invocation["command"]
     assert invocation["workspace_path"] == str(workspace_path)
+    assert invocation["runner_contract_schema_version"] == "patchrail.runner_contract.v1"
+    assert invocation["artifact_dir"] == str(workspace_path / "artifacts")
+    assert invocation["trace_file"] == str(workspace_path / "trace.json")
     trace = json.loads(artifact_paths["trace"].read_text())
     assert trace["schema_version"] == "patchrail.runner_trace.v1"
     assert trace["runner_name"] == "claude_code"
@@ -518,16 +524,19 @@ def test_brief_create_list_show_and_plan_reference_preserve_existing_flow(
     brief_id = brief_created["brief"]["id"]
     assert brief_created["brief"]["task_id"] == task_id
     assert brief_created["brief"]["kind"] == "future"
+    assert brief_created["brief"]["schema_version"] == "patchrail.brief_schema.v1"
     assert "canonical lifecycle" in brief_created["brief"]["content"]
     assert Path(brief_created["brief"]["storage_path"]).exists()
 
     exit_code, brief_list = run_cli(["brief", "list", "--task-id", task_id], capsys)
     assert exit_code == 0
     assert [brief["id"] for brief in brief_list["briefs"]] == [brief_id]
+    assert brief_list["briefs"][0]["schema_version"] == "patchrail.brief_schema.v1"
 
     exit_code, brief_shown = run_cli(["brief", "show", "--brief-id", brief_id], capsys)
     assert exit_code == 0
     assert brief_shown["brief"]["id"] == brief_id
+    assert brief_shown["brief"]["schema_version"] == "patchrail.brief_schema.v1"
     assert "Finished means" in brief_shown["brief"]["content"]
 
     exit_code, planned = run_cli(
@@ -540,6 +549,7 @@ def test_brief_create_list_show_and_plan_reference_preserve_existing_flow(
         {
             "id": brief_id,
             "kind": "future",
+            "schema_version": "patchrail.brief_schema.v1",
             "source_path": str(brief_file),
             "storage_path": brief_created["brief"]["storage_path"],
             "sha256": brief_created["brief"]["sha256"],
@@ -557,10 +567,119 @@ def test_brief_create_list_show_and_plan_reference_preserve_existing_flow(
     run_id = executed["run"]["id"]
     workspace_plan = json.loads((Path(executed["run"]["workspace_path"]) / "plan.json").read_text())
     assert workspace_plan["planning_briefs"][0]["id"] == brief_id
+    assert workspace_plan["planning_briefs"][0]["schema_version"] == "patchrail.brief_schema.v1"
 
     exit_code, logs_payload = run_cli(["logs", "--run-id", run_id], capsys)
     assert exit_code == 0
     assert "local harness stdout" in logs_payload["stdout"]
+
+
+def test_brief_show_human_output_displays_schema_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Visible schema", "--description", "Show brief schema on read"],
+        capsys,
+    )
+    assert exit_code == 0
+    brief_file = tmp_path / "future.md"
+    brief_file.write_text("# Future Completion Brief\n\nSchema visibility belongs on read commands.\n")
+
+    exit_code, brief_created = run_cli(
+        ["brief", "create", "--task-id", created["task"]["id"], "--kind", "future", "--file", str(brief_file)],
+        capsys,
+    )
+    assert exit_code == 0
+
+    exit_code, stdout, stderr = run_cli_text(["brief", "show", "--brief-id", brief_created["brief"]["id"]], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert "Schema: patchrail.brief_schema.v1" in stdout
+    assert "Schema visibility belongs on read commands." in stdout
+
+
+def test_brief_validate_reports_missing_v1_sequence_without_changing_task_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Validate briefs", "--description", "Report missing brief kinds"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+    brief_file = tmp_path / "future.md"
+    brief_file.write_text("# Future Completion Brief\n\nCompleted state is explicit.\n")
+    exit_code, brief_created = run_cli(
+        ["brief", "create", "--task-id", task_id, "--kind", "future", "--file", str(brief_file)],
+        capsys,
+    )
+    assert exit_code == 0
+
+    exit_code, validation = run_cli(["brief", "validate", "--task-id", task_id], capsys)
+
+    assert exit_code == 0
+    assert validation["brief_validation"] == {
+        "task_id": task_id,
+        "schema_version": "patchrail.brief_schema.v1",
+        "valid": False,
+        "required_kinds": ["future", "ontology", "product"],
+        "present_kinds": ["future"],
+        "missing_kinds": ["ontology", "product"],
+        "briefs": [
+            {
+                "id": brief_created["brief"]["id"],
+                "kind": "future",
+                "schema_version": "patchrail.brief_schema.v1",
+                "attached_plan_id": None,
+            }
+        ],
+    }
+    exit_code, status_payload = run_cli(["status", "--task-id", task_id], capsys)
+    assert exit_code == 0
+    assert status_payload["task"]["state"] == "created"
+
+
+def test_brief_validate_human_output_reports_v1_readiness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PATCHRAIL_HOME", str(tmp_path / ".patchrail"))
+
+    exit_code, created = run_cli(
+        ["task", "create", "--title", "Readable validation", "--description", "Show validation status"],
+        capsys,
+    )
+    assert exit_code == 0
+    task_id = created["task"]["id"]
+    for kind in ("future", "ontology", "product"):
+        brief_file = tmp_path / f"{kind}.md"
+        brief_file.write_text(f"# {kind.title()} Brief\n\nConcrete {kind} boundary.\n")
+        exit_code, _ = run_cli(
+            ["brief", "create", "--task-id", task_id, "--kind", kind, "--file", str(brief_file)],
+            capsys,
+        )
+        assert exit_code == 0
+
+    exit_code, stdout, stderr = run_cli_text(["brief", "validate", "--task-id", task_id], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert f"Brief schema validation for task {task_id}" in stdout
+    assert "Schema: patchrail.brief_schema.v1" in stdout
+    assert "Status: ready" in stdout
+    assert "Required: future -> ontology -> product" in stdout
+    assert "Present: future, ontology, product" in stdout
+    assert "Missing: none" in stdout
 
 
 def test_brief_create_rejects_duplicate_pending_kind(
@@ -785,6 +904,32 @@ def test_real_preset_flow_can_complete_after_fallback_approval(
         return (1, "", "unsupported")
 
     monkeypatch.setattr("patchrail.core.preflight._run_status_command", fake_run_status_command, raising=False)
+
+    class FakeSubscriptionRunner:
+        name = "auto"
+        mode = "subscription"
+        command = "provider-subscription:test"
+
+        def run(self, task, plan, workspace_path, run_id):  # noqa: ANN001
+            return RunnerResult(
+                stdout="subscription runner stdout\n",
+                stderr="",
+                execution_summary="# Subscription Execution Summary\n",
+                diff_summary="- Subscription diff summary\n",
+                cost_metrics=CostMetrics(
+                    prompt_tokens=13,
+                    completion_tokens=21,
+                    estimated_usd=0.0,
+                    elapsed_seconds=0.1,
+                ),
+                exit_code=0,
+            )
+
+    monkeypatch.setattr(
+        "patchrail.core.service.build_subscription_runner",
+        lambda candidate, runner_name: FakeSubscriptionRunner(),
+        raising=False,
+    )
 
     exit_code, _ = run_cli(["config", "init", "--preset", "real"], capsys)
     assert exit_code == 0

@@ -58,15 +58,46 @@ print(data)
 ' "$@"
 }
 
+json_query_len() {
+  "$PYTHON_BIN" -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+for key in sys.argv[1:]:
+    data = data[key]
+print(len(data))
+' "$@"
+}
+
 run_patchrail config init --preset "$PATCHRAIL_CONFIG_PRESET" --workflow-backend "$PATCHRAIL_WORKFLOW_BACKEND" >/dev/null
 run_patchrail preflight --role planner >/dev/null
 run_patchrail preflight --role reviewer >/dev/null
 run_patchrail preflight --role executor --runner "$PATCHRAIL_RUNNER" >/dev/null
 
-create_output=$(run_patchrail task create \
+setup_output=$(run_patchrail setup project \
   --title "Local Smoke Test" \
   --description "Exercise the local Patchrail flow")
-task_id=$(printf '%s' "$create_output" | json_query task id)
+task_id=$(printf '%s' "$setup_output" | json_query setup task id)
+future_brief_file=$(printf '%s' "$setup_output" | json_query setup brief_files future)
+ontology_brief_file=$(printf '%s' "$setup_output" | json_query setup brief_files ontology)
+product_brief_file=$(printf '%s' "$setup_output" | json_query setup brief_files product)
+
+printf '\nSmoke evidence: future completion is explicit and locally inspectable.\n' >> "$future_brief_file"
+printf '\nSmoke evidence: Patchrail owns canonical state and approval boundaries.\n' >> "$ontology_brief_file"
+printf '\nSmoke evidence: operators can verify post-implementation acceptance locally.\n' >> "$product_brief_file"
+
+run_patchrail brief create --task-id "$task_id" --kind future --file "$future_brief_file" >/dev/null
+run_patchrail brief create --task-id "$task_id" --kind ontology --file "$ontology_brief_file" >/dev/null
+run_patchrail brief create --task-id "$task_id" --kind product --file "$product_brief_file" >/dev/null
+
+validation_output=$(run_patchrail brief validate --task-id "$task_id")
+brief_validation_ready=$(printf '%s' "$validation_output" | json_query brief_validation valid)
+brief_count=$(printf '%s' "$validation_output" | json_query_len brief_validation briefs)
+if [ "$brief_validation_ready" != "True" ]; then
+  printf '%s\n' "$validation_output" >&2
+  exit 1
+fi
 
 if [ "$PATCHRAIL_AUTO_PLAN" = "1" ]; then
   run_patchrail plan \
@@ -134,4 +165,5 @@ final_state=$(printf '%s' "$status_output" | json_query task state)
 
 printf 'Local smoke flow completed: preset=%s workflow_backend=%s task=%s run=%s state=%s fallback_approved=%s auto_plan=%s auto_review=%s\n' \
   "$PATCHRAIL_CONFIG_PRESET" "$PATCHRAIL_WORKFLOW_BACKEND" "$task_id" "$run_id" "$final_state" "$fallback_approved" "$PATCHRAIL_AUTO_PLAN" "$PATCHRAIL_AUTO_REVIEW"
+printf 'Brief schema validation: schema=%s briefs=%s\n' "patchrail.brief_schema.v1" "$brief_count"
 printf 'PATCHRAIL_HOME=%s\n' "$PATCHRAIL_HOME"

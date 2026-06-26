@@ -14,6 +14,8 @@ def render_payload(args: Any, payload: dict[str, Any]) -> str:
         return _render_setup(payload)
     if args.command == "doctor":
         return _render_doctor(payload)
+    if args.command == "contracts" and getattr(args, "contracts_command", None) == "runner":
+        return _render_runner_contract(payload)
     if args.command == "task" and getattr(args, "task_command", None) == "create":
         return _render_task_create(payload)
     if args.command == "brief":
@@ -205,6 +207,28 @@ def _render_doctor(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_runner_contract(payload: dict[str, Any]) -> str:
+    contract = payload["runner_contract"]
+    lines = [
+        "Runner Contract",
+        f"Schema: {contract['schema_version']}",
+        f"Owns canonical state: {contract['owns_canonical_state']}",
+        "Workspace files:",
+    ]
+    for name, path in contract["workspace_files"].items():
+        lines.append(f"  {name}: {path}")
+    lines.append("Reserved environment:")
+    for variable in contract["reserved_environment"]:
+        lines.append(f"  {variable}")
+    lines.append("Runner-writable paths:")
+    for path in contract["runner_writable_paths"]:
+        lines.append(f"  {path}")
+    lines.append("Forbidden ownership:")
+    for boundary in contract["forbidden_ownership"]:
+        lines.append(f"  {boundary}")
+    return "\n".join(lines)
+
+
 def _render_task_create(payload: dict[str, Any]) -> str:
     task = payload["task"]
     return "\n".join(
@@ -242,12 +266,26 @@ def _render_brief(brief_command: str, payload: dict[str, Any]) -> str:
             [
                 f"Brief {brief['id']} ({brief['kind']})",
                 f"Task: {brief['task_id']}",
+                f"Schema: {brief['schema_version']}",
                 f"Source: {brief['source_path']}",
                 f"Storage: {brief['storage_path']}",
                 "",
                 brief["content"].rstrip(),
             ]
         ).rstrip()
+    if brief_command == "validate":
+        validation = payload["brief_validation"]
+        missing = validation["missing_kinds"]
+        return "\n".join(
+            [
+                f"Brief schema validation for task {validation['task_id']}",
+                f"Schema: {validation['schema_version']}",
+                f"Status: {'ready' if validation['valid'] else 'missing required briefs'}",
+                f"Required: {' -> '.join(validation['required_kinds'])}",
+                f"Present: {', '.join(validation['present_kinds']) if validation['present_kinds'] else 'none'}",
+                f"Missing: {', '.join(missing) if missing else 'none'}",
+            ]
+        )
     return _render_unknown(payload)
 
 

@@ -26,11 +26,46 @@ def test_pyproject_declares_mit_license_metadata() -> None:
     assert "License :: OSI Approved :: MIT License" in project["classifiers"]
 
 
+def test_release_version_is_synchronized() -> None:
+    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())["project"]
+    init_globals: dict[str, str] = {}
+    exec((REPO_ROOT / "patchrail" / "__init__.py").read_text(), init_globals)
+
+    assert project["version"] == "0.2.0a1"
+    assert init_globals["__version__"] == project["version"]
+
+
+def test_changelog_documents_alpha_release_direction() -> None:
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
+
+    assert "## v0.2.0-alpha.1 - 2026-06-26" in changelog
+    assert "Brief Schema v1" in changelog
+    assert "Runner Contract v1" in changelog
+    assert "Evidence Bundle v1" in changelog
+    assert "skill-first, CLI-backed" in changelog
+
+
 def test_readme_mentions_mit_license() -> None:
     readme = (REPO_ROOT / "README.md").read_text()
 
     assert "## License" in readme
     assert "MIT" in readme
+
+
+def test_readme_separates_current_release_from_next_direction() -> None:
+    readme = (REPO_ROOT / "README.md").read_text()
+
+    assert "## Current Release" in readme
+    assert "## Next Direction" in readme
+    current = readme.split("## Current Release", 1)[1].split("## Next Direction", 1)[0]
+    next_direction = readme.split("## Next Direction", 1)[1]
+    assert "Brief Schema v1" in current
+    assert "Runner Contract v1" in current
+    assert "Evidence Bundle v1" in current
+    assert "ApprovalProfile v1" not in current
+    assert "ApprovalProfile v1" in next_direction
+    assert "RunLedger v1" in next_direction
+    assert "patchrail-supervise" in next_direction
 
 
 def test_english_readme_exists_without_japanese_text() -> None:
@@ -57,6 +92,18 @@ def test_public_repo_excludes_internal_planning_directories() -> None:
     )
 
     assert result.stdout == ""
+
+
+def test_public_patchrail_supervise_skill_exists() -> None:
+    skill_path = REPO_ROOT / "skills" / "patchrail-supervise" / "SKILL.md"
+
+    assert skill_path.exists()
+    content = skill_path.read_text()
+    assert "name: patchrail-supervise" in content
+    assert "patchrail brief validate" in content
+    assert "patchrail contracts runner" in content
+    assert "Do not approve or reject the final outcome without explicit human instruction." in content
+    assert "Skill instructions are not the enforcement layer." in content
 
 
 def test_gitignore_ignores_internal_planning_directories() -> None:

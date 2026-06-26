@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0-alpha.1 - 2026-06-26
+
+Direction-setting alpha release for the skill-first, CLI-backed Patchrail roadmap.
+
+### Added
+
+- Brief Schema v1 for `future`, `ontology`, and `product` planning briefs, including persisted `schema_version` markers and plan-snapshot references.
+- `patchrail brief validate` for read-only readiness checks over the required planning brief sequence.
+- Runner Contract v1 for shell-backed executor handoff, reserved environment variables, workspace paths, and read-only CLI inspection through `patchrail contracts runner`.
+- Evidence Bundle v1 manifest metadata, schema markers, structured runner trace support, and canonical collection of runner-local artifacts.
+- Local smoke coverage that creates all three briefs, validates them, executes the local harness, persists runner evidence, reviews, and records human approval.
+- First public `patchrail-supervise` Agent Skill scaffold for Codex, Claude Code, Grok Build, and compatible agents.
+
+### Changed
+
+- README and PRD direction now separate implemented alpha behavior from the next `ApprovalProfile v1`, `RunLedger v1`, and skill-first delegation work.
+- Runner invocation metadata now includes the Runner Contract schema version, artifact directory, and trace file path.
+- Local harness output now includes runtime contract evidence and a reproducibility report collected into the canonical evidence bundle.
+
+### Not Yet Included
+
+- `ApprovalProfile v1` runtime storage and editing.
+- `RunLedger v1` action receipt, escalation, denial, and rollback persistence.
+- Codex plugin packaging for the `patchrail-supervise` skill after the scaffold is validated.
+
 ## v0.1.0 - 2026-04-19
 
 Initial public MVP release.

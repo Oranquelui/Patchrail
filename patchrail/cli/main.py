@@ -32,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
     brief_list.add_argument("--task-id", required=True)
     brief_show = brief_subparsers.add_parser("show")
     brief_show.add_argument("--brief-id", required=True)
+    brief_validate = brief_subparsers.add_parser("validate")
+    brief_validate.add_argument("--task-id", required=True)
 
     config_parser = subparsers.add_parser("config")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
@@ -57,6 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("--once", action="store_true", help="Render the home screen once and exit.")
 
     subparsers.add_parser("doctor")
+
+    contracts_parser = subparsers.add_parser("contracts")
+    contracts_subparsers = contracts_parser.add_subparsers(dest="contracts_command", required=True)
+    contracts_subparsers.add_parser("runner")
 
     plan_parser = subparsers.add_parser("plan")
     plan_parser.add_argument("--task-id", required=True)
@@ -144,6 +150,8 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
         return app.list_briefs(task_id=args.task_id)
     if args.command == "brief" and args.brief_command == "show":
         return app.show_brief(brief_id=args.brief_id)
+    if args.command == "brief" and args.brief_command == "validate":
+        return app.validate_briefs(task_id=args.task_id)
     if args.command == "config" and args.config_command == "init":
         return app.init_config(preset=args.preset, workflow_backend=args.workflow_backend)
     if args.command == "setup":
@@ -163,6 +171,8 @@ def execute(args: argparse.Namespace, app: PatchrailApp | None = None) -> dict[s
         return app.start(preset=args.preset, workflow_backend=args.workflow_backend)
     if args.command == "doctor":
         return app.doctor()
+    if args.command == "contracts" and args.contracts_command == "runner":
+        return app.get_runner_contract()
     if args.command == "plan":
         return app.create_plan(
             task_id=args.task_id,

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import mimetypes
+import shutil
 from pathlib import Path
 from typing import Any
 
+from patchrail.core.layers import EVIDENCE_BUNDLE_CONTRACT
 from patchrail.core.ids import utc_now
 from patchrail.models.entities import ArtifactBundle, ArtifactFile
 from patchrail.storage.filesystem import FilesystemStore
@@ -23,6 +26,7 @@ class ArtifactService:
         stderr: str,
         invocation: dict[str, Any],
         runner_trace: dict[str, Any] | None = None,
+        runner_artifact_dir: Path | None = None,
     ) -> ArtifactBundle:
         artifact_dir = self.store.artifact_dir(run_id)
         artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -76,11 +80,18 @@ class ArtifactService:
                 logical_kind="runner_trace",
                 media_type="application/json",
             )
+        self._collect_runner_artifacts(
+            runner_artifact_dir=runner_artifact_dir,
+            canonical_artifact_dir=artifact_dir,
+            files=files,
+            artifacts=artifacts,
+        )
 
         bundle = ArtifactBundle(
             run_id=run_id,
             created_at=utc_now(),
             files=files,
+            schema_version=EVIDENCE_BUNDLE_CONTRACT.schema_version,
             artifacts=artifacts,
             summary=execution_summary,
         )
@@ -93,6 +104,32 @@ class ArtifactService:
     def get_stdout(self, run_id: str) -> str:
         return self.store.read_stdout_log(run_id)
 
+    def _collect_runner_artifacts(
+        self,
+        runner_artifact_dir: Path | None,
+        canonical_artifact_dir: Path,
+        files: dict[str, str],
+        artifacts: dict[str, ArtifactFile],
+    ) -> None:
+        if runner_artifact_dir is None or not runner_artifact_dir.exists():
+            return
+
+        canonical_runner_dir = canonical_artifact_dir / "runner-artifacts"
+        for source_path in sorted(
+            path for path in runner_artifact_dir.rglob("*") if path.is_file() and not path.is_symlink()
+        ):
+            relative_path = source_path.relative_to(runner_artifact_dir)
+            destination_path = canonical_runner_dir / relative_path
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination_path)
+            manifest_key = f"runner_artifact:{relative_path.as_posix()}"
+            files[manifest_key] = str(destination_path)
+            artifacts[manifest_key] = self._artifact_file(
+                destination_path,
+                logical_kind="runner_artifact",
+                media_type=self._media_type(destination_path),
+            )
+
     def _artifact_file(self, path: Path, logical_kind: str, media_type: str) -> ArtifactFile:
         payload = path.read_bytes()
         return ArtifactFile(
@@ -103,3 +140,9 @@ class ArtifactService:
             sha256=hashlib.sha256(payload).hexdigest(),
             size_bytes=len(payload),
         )
+
+    def _media_type(self, path: Path) -> str:
+        if path.suffix == ".json":
+            return "application/json"
+        media_type, _encoding = mimetypes.guess_type(path.name)
+        return media_type or "application/octet-stream"

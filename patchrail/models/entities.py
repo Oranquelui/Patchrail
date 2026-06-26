@@ -135,6 +135,7 @@ class Task:
 class PlanningBriefReference:
     id: str
     kind: BriefKind
+    schema_version: str
     source_path: str
     storage_path: str
     sha256: str
@@ -145,6 +146,7 @@ class PlanningBriefReference:
         return cls(
             id=payload["id"],
             kind=BriefKind(payload["kind"]),
+            schema_version=payload.get("schema_version", "patchrail.brief_schema.v1"),
             source_path=payload["source_path"],
             storage_path=payload["storage_path"],
             sha256=payload["sha256"],
@@ -157,6 +159,7 @@ class PlanningBrief:
     id: str
     task_id: str
     kind: BriefKind
+    schema_version: str
     source_path: str
     storage_path: str
     content: str
@@ -170,6 +173,7 @@ class PlanningBrief:
             id=payload["id"],
             task_id=payload["task_id"],
             kind=BriefKind(payload["kind"]),
+            schema_version=payload.get("schema_version", "patchrail.brief_schema.v1"),
             source_path=payload["source_path"],
             storage_path=payload["storage_path"],
             content=payload["content"],
@@ -182,6 +186,7 @@ class PlanningBrief:
         return PlanningBriefReference(
             id=self.id,
             kind=self.kind,
+            schema_version=self.schema_version,
             source_path=self.source_path,
             storage_path=self.storage_path,
             sha256=self.sha256,
@@ -233,6 +238,7 @@ class ArtifactBundle:
     created_at: str
     files: dict[str, str]
     summary: str
+    schema_version: str = "patchrail.evidence_bundle.v1"
     artifacts: dict[str, ArtifactFile] = field(default_factory=dict)
 
     @classmethod
@@ -241,6 +247,7 @@ class ArtifactBundle:
             run_id=payload["run_id"],
             created_at=payload["created_at"],
             files=dict(payload["files"]),
+            schema_version=payload.get("schema_version", "patchrail.evidence_bundle.v1"),
             artifacts={
                 name: ArtifactFile.from_dict(item)
                 for name, item in payload.get("artifacts", {}).items()
